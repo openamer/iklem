@@ -36,3 +36,12 @@ def test_multiple_channels(monkeypatch):
     channels = _configured_channels(agent=None)
     names = {c.name for c in channels}
     assert names == {"telegram", "slack", "discord"}
+
+
+def test_whatsapp_and_signal_channels(monkeypatch):
+    monkeypatch.setenv("IKLEM_WHATSAPP_TOKEN", "w")
+    monkeypatch.setenv("IKLEM_WHATSAPP_PHONE_ID", "p")
+    monkeypatch.setenv("IKLEM_SIGNAL_NUMBER", "+123")
+    channels = _configured_channels(agent=None)
+    names = {c.name for c in channels}
+    assert names == {"whatsapp", "signal"}

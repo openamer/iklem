@@ -17,6 +17,15 @@ from iklem.tools.registry import all_tools, tool_by_name
 from iklem.memory import history as history_store
 
 
+def _slugify(text: str) -> str:
+    """Turn a user message into a short, safe skill name."""
+    import re
+
+    words = re.findall(r"[a-zA-Z0-9]+", text.lower())
+    name = "-".join(words[:5]) or "task"
+    return name[:40]
+
+
 def _tool_schema(tool) -> dict:
     """Build an OpenAI/Ollama-style tool schema from a Tool.
 
@@ -88,6 +97,7 @@ class Agent:
 
         tools = all_tools()
         schemas = [_tool_schema(t) for t in tools]
+        tool_trace: list[str] = []
 
         for _ in range(self.max_tool_rounds):
             result = self.provider.complete(messages, tools=schemas)
@@ -100,6 +110,7 @@ class Agent:
                 self.history.append(Message(role="assistant", content=result.content))
                 if self.persist_history:
                     history_store.save_history(self.history)
+                self._maybe_distill(user, tool_trace)
                 return result
 
             # Execute tool calls and append results for the next round.
@@ -111,6 +122,7 @@ class Agent:
                 )
             )
             for tc in result.tool_calls:
+                tool_trace.append(tc.name)
                 output = self._run_tool(tc)
                 messages.append(
                     Message(
@@ -125,6 +137,25 @@ class Agent:
             ok=False,
             error="tool-call loop exceeded the safety cap",
         )
+
+    def _maybe_distill(self, user: str, tool_trace: list[str]) -> None:
+        """Deterministically distill a multi-step procedure into a skill.
+
+        If a task used 2+ distinct tool calls, it is a reusable procedure:
+        save it as a skill so the agent can recall the steps next time. This
+        is the observable "improves with use" — not prompt-driven, but a real
+        side effect of the loop.
+        """
+        distinct = list(dict.fromkeys(tool_trace))
+        if len(distinct) < 2:
+            return
+        from iklem.memory.skills import Skill, SkillRegistry
+        from iklem.memory.store import MemoryStore
+
+        name = _slugify(user)
+        steps = [f"call {t}" for t in distinct]
+        reg = SkillRegistry(MemoryStore())
+        reg.add(Skill(name=name, description=user[:80], steps=steps))
 
     def _run_tool(self, call: ToolCall) -> str:
         tool = tool_by_name(call.name)

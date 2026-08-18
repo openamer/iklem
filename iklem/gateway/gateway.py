@@ -34,6 +34,16 @@ def _configured_channels(agent: Agent) -> list[Channel]:
 
         channels.append(DiscordChannel())
 
+    if os.environ.get("IKLEM_WHATSAPP_TOKEN") and os.environ.get("IKLEM_WHATSAPP_PHONE_ID"):
+        from iklem.gateway.whatsapp import WhatsAppChannel
+
+        channels.append(WhatsAppChannel())
+
+    if os.environ.get("IKLEM_SIGNAL_NUMBER"):
+        from iklem.gateway.signal import SignalChannel
+
+        channels.append(SignalChannel())
+
     return channels
 
 

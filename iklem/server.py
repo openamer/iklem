@@ -215,6 +215,15 @@ def make_handler(manager: SessionManager) -> type[BaseHTTPRequestHandler]:
         def do_GET(self) -> None:
             if self.path == "/health":
                 self._json({"ok": True, "version": "0.1.0"})
+            elif self.path == "/" or self.path == "/index.html":
+                from iklem.webui import WEB_UI_HTML
+
+                body = WEB_UI_HTML.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
             elif self.path == "/sessions":
                 self._json(manager.list())
             elif self.path == "/config":
