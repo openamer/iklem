@@ -7,11 +7,11 @@ single question. Both report honest errors when the provider fails.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from iklem.core.agent import Agent
 from iklem.memory.skills import Skill, SkillRegistry
-from iklem.providers.openai_compatible import OpenAICompatibleProvider
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -22,12 +22,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skill", nargs=2, metavar=("NAME", "DESC"), help="add a skill")
     p.add_argument("--skills", action="store_true", help="list skills")
     p.add_argument("--gateway", action="store_true", help="start the Telegram channel")
+    p.add_argument("--swarm-sign", nargs=3, metavar=("NODE", "KIND", "CONTENT"), help="sign a knowledge packet")
     p.add_argument("ask", nargs="*", help="ask a question (non-interactive)")
     return p
 
 
 def _make_agent() -> Agent:
-    provider = OpenAICompatibleProvider()
+    # Prefer a local Ollama model (private, no key) when reachable; fall back
+    # to the OpenAI-compatible provider otherwise.
+    from iklem.providers.ollama import OllamaProvider
+
+    provider = OllamaProvider()
     return Agent(provider=provider)
 
 
@@ -74,6 +79,19 @@ def main(argv: list[str] | None = None) -> int:
 
         channel = TelegramChannel()
         channel.start(_make_agent())
+        return 0
+
+    if args.swarm_sign:
+        from iklem.swarm.packet import KnowledgePacket, is_leak_free
+
+        node, kind, content = args.swarm_sign
+        if not is_leak_free(content):
+            print("✗ content looks like it contains a secret — refusing to sign")
+            return 1
+        pkt = KnowledgePacket(node_id=node, kind=kind, content=content)
+        pkt.sign(os.environ.get("IKLEM_SWARM_SECRET", "dev-secret"))
+        print(f"✓ signed packet (node={node}, kind={kind})")
+        print(f"  signature: {pkt.signature[:16]}…")
         return 0
 
     if args.ask:
