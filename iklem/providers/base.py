@@ -1,7 +1,8 @@
 """Provider abstraction — the model backend is a plugin.
 
-A provider turns a conversation into a model response. The core stays
-model-agnostic: it talks to this interface, never to a specific vendor.
+A provider turns a conversation into a model response, and can also emit
+tool calls when given tool definitions. The core stays model-agnostic: it
+talks to this interface, never to a specific vendor.
 """
 
 from __future__ import annotations
@@ -12,17 +13,33 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Message:
-    role: str  # "system" | "user" | "assistant"
+    role: str  # "system" | "user" | "assistant" | "tool"
     content: str
+    # For tool-call messages: the tool name and its arguments (JSON string).
+    tool_name: str | None = None
+    tool_call_id: str | None = None
+
+
+@dataclass
+class ToolCall:
+    """A tool invocation the model requested."""
+
+    name: str
+    arguments: dict
 
 
 @dataclass
 class ProviderResult:
-    """A model response, honestly reported."""
+    """A model response, honestly reported.
 
-    content: str
+    Either `content` is set (a plain answer) or `tool_calls` is non-empty
+    (the model wants to call tools before answering).
+    """
+
+    content: str = ""
     ok: bool = True
     error: str | None = None
+    tool_calls: list[ToolCall] = field(default_factory=list)
 
 
 class Provider(ABC):
@@ -31,6 +48,10 @@ class Provider(ABC):
     name: str = "base"
 
     @abstractmethod
-    def complete(self, messages: list[Message]) -> ProviderResult:
-        """Return a model response for the given messages."""
+    def complete(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+    ) -> ProviderResult:
+        """Return a model response (or tool calls) for the given messages."""
         raise NotImplementedError

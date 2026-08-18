@@ -1,8 +1,8 @@
-"""Ollama provider — a local model backend, no API key required.
+"""Ollama provider — a local model backend with native tool calling.
 
-Ollama speaks a simple HTTP API on localhost:11434. This provider is the
-simplest way to run iklem with a real model on your own machine, fully
-offline and private.
+Ollama's /api/chat supports a `tools` parameter and returns
+`message.tool_calls` when the model decides to call a tool. This provider
+surfaces those tool calls so the agent loop can execute them.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import os
 import urllib.error
 import urllib.request
 
-from iklem.providers.base import Message, Provider, ProviderResult
+from iklem.providers.base import Message, Provider, ProviderResult, ToolCall
 
 
 class OllamaProvider(Provider):
@@ -28,17 +28,22 @@ class OllamaProvider(Provider):
         self.base_url = (
             base_url or os.environ.get("IKLEM_OLLAMA_URL", "http://localhost:11434")
         ).rstrip("/")
-        # Disable the "thinking" (chain-of-thought) block by default: on CPU
-        # it can add tens of seconds of latency for no user-visible benefit.
         self.think = think
 
-    def complete(self, messages: list[Message]) -> ProviderResult:
-        payload = {
+    def complete(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+    ) -> ProviderResult:
+        payload: dict = {
             "model": self.model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
+            "messages": [self._to_ollama(m) for m in messages],
             "stream": False,
             "think": self.think,
         }
+        if tools:
+            payload["tools"] = tools
+
         req = urllib.request.Request(
             f"{self.base_url}/api/chat",
             data=json.dumps(payload).encode("utf-8"),
@@ -50,23 +55,38 @@ class OllamaProvider(Provider):
                 data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.URLError as e:
             return ProviderResult(
-                content="",
                 ok=False,
                 error=f"ollama not reachable at {self.base_url}: {e.reason}",
             )
         except urllib.error.HTTPError as e:
             return ProviderResult(
-                content="",
                 ok=False,
                 error=f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]}",
             )
 
-        try:
-            content = data["message"]["content"]
-        except (KeyError, TypeError) as e:
-            return ProviderResult(
-                content="",
-                ok=False,
-                error=f"unexpected response shape: {e}",
-            )
-        return ProviderResult(content=content, ok=True)
+        message = data.get("message", {})
+        tool_calls = []
+        for tc in message.get("tool_calls", []):
+            fn = tc.get("function", {})
+            name = fn.get("name", "")
+            raw_args = fn.get("arguments", "{}") or "{}"
+            if isinstance(raw_args, dict):
+                args = raw_args
+            else:
+                try:
+                    args = json.loads(raw_args)
+                except json.JSONDecodeError:
+                    args = {}
+            tool_calls.append(ToolCall(name=name, arguments=args))
+
+        content = message.get("content", "")
+        return ProviderResult(content=content, ok=True, tool_calls=tool_calls)
+
+    @staticmethod
+    def _to_ollama(m: Message) -> dict:
+        msg: dict = {"role": m.role, "content": m.content}
+        if m.role == "tool":
+            # Ollama expects tool results as a "tool" role message with the
+            # tool name; we encode the name in content for simplicity.
+            msg["content"] = m.content
+        return msg

@@ -1,8 +1,8 @@
-"""OpenAI-compatible provider — works with OpenAI, OpenRouter, and any
-endpoint that speaks the OpenAI chat-completions protocol.
+"""OpenAI-compatible provider — with tool calling.
 
-This is the first real provider plugin. It reports honest errors instead of
-fabricating a response when the API call fails.
+Works with OpenAI, OpenRouter, and any endpoint speaking the OpenAI
+chat-completions protocol. Surfaces tool calls so the agent loop can execute
+them.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import os
 import urllib.error
 import urllib.request
 
-from iklem.providers.base import Message, Provider, ProviderResult
+from iklem.providers.base import Message, Provider, ProviderResult, ToolCall
 
 
 class OpenAICompatibleProvider(Provider):
@@ -31,18 +31,21 @@ class OpenAICompatibleProvider(Provider):
         ).rstrip("/")
         self.model = model or os.environ.get("IKLEM_MODEL", "gpt-4o-mini")
 
-    def complete(self, messages: list[Message]) -> ProviderResult:
+    def complete(
+        self,
+        messages: list[Message],
+        tools: list[dict] | None = None,
+    ) -> ProviderResult:
         if not self.api_key:
-            return ProviderResult(
-                content="",
-                ok=False,
-                error="no API key — set IKLEM_API_KEY",
-            )
+            return ProviderResult(ok=False, error="no API key — set IKLEM_API_KEY")
 
-        payload = {
+        payload: dict = {
             "model": self.model,
             "messages": [{"role": m.role, "content": m.content} for m in messages],
         }
+        if tools:
+            payload["tools"] = tools
+
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions",
             data=json.dumps(payload).encode("utf-8"),
@@ -57,19 +60,29 @@ class OpenAICompatibleProvider(Provider):
                 data = json.loads(resp.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             return ProviderResult(
-                content="",
                 ok=False,
                 error=f"HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]}",
             )
         except urllib.error.URLError as e:
-            return ProviderResult(content="", ok=False, error=f"network error: {e.reason}")
+            return ProviderResult(ok=False, error=f"network error: {e.reason}")
 
         try:
-            content = data["choices"][0]["message"]["content"]
+            choice = data["choices"][0]["message"]
         except (KeyError, IndexError) as e:
-            return ProviderResult(
-                content="",
-                ok=False,
-                error=f"unexpected response shape: {e}",
-            )
-        return ProviderResult(content=content, ok=True)
+            return ProviderResult(ok=False, error=f"unexpected response shape: {e}")
+
+        tool_calls = []
+        for tc in choice.get("tool_calls", []):
+            fn = tc.get("function", {})
+            name = fn.get("name", "")
+            try:
+                args = json.loads(fn.get("arguments", "{}") or "{}")
+            except json.JSONDecodeError:
+                args = {}
+            tool_calls.append(ToolCall(name=name, arguments=args))
+
+        return ProviderResult(
+            content=choice.get("content", ""),
+            ok=True,
+            tool_calls=tool_calls,
+        )
