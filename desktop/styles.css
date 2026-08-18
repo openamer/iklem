@@ -12,6 +12,20 @@
   --danger: #f85149;
 }
 
+body.light {
+  --bg: #ffffff;
+  --bg-sidebar: #f6f8fa;
+  --bg-elevated: #ffffff;
+  --border: #d0d7de;
+  --text: #1f2328;
+  --text-dim: #656d76;
+  --accent: #0969da;
+  --accent-dim: #0969da;
+  --user-bubble: #0969da;
+  --assistant-bubble: #f6f8fa;
+  --danger: #cf222e;
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 html, body { height: 100%; }
@@ -73,7 +87,7 @@ body {
 .session-item:hover { background: var(--bg-elevated); color: var(--text); }
 .session-item.active { background: var(--bg-elevated); color: var(--text); }
 
-.sidebar-footer { padding: 12px; border-top: 1px solid var(--border); }
+.sidebar-footer { padding: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
 .footer-btn {
   width: 100%;
   padding: 8px;
@@ -146,6 +160,12 @@ body {
 .msg.assistant a { color: var(--accent); text-decoration: none; }
 .msg.assistant a:hover { text-decoration: underline; }
 .msg.assistant strong { font-weight: 600; }
+
+/* Syntax highlighting tokens */
+.tok-kw { color: #ff7b72; }
+.tok-str { color: #a5d6ff; }
+.tok-com { color: #8b949e; font-style: italic; }
+.tok-num { color: #79c0ff; }
 
 /* Composer */
 .composer {

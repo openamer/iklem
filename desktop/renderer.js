@@ -187,6 +187,30 @@ $('settings-btn').onclick = () => {
 };
 $('settings-close').onclick = () => $('settings-modal').classList.add('hidden');
 
+// Theme toggle (persisted in localStorage)
+function applyTheme(light) {
+  document.body.classList.toggle('light', light);
+  $('theme-btn').textContent = light ? '☀️ Theme' : '🌙 Theme';
+  localStorage.setItem('iklem-theme', light ? 'light' : 'dark');
+}
+$('theme-btn').onclick = () => {
+  applyTheme(!document.body.classList.contains('light'));
+};
+// Restore saved theme
+if (localStorage.getItem('iklem-theme') === 'light') applyTheme(true);
+
+// Keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey && e.key === 'n') {
+    e.preventDefault();
+    newSession();
+  }
+  if (e.ctrlKey && e.key === 'l') {
+    e.preventDefault();
+    $('input').focus();
+  }
+});
+
 $('ctx-rename').onclick = () => {
   hideContextMenu();
   if (contextTargetId) renameSession(contextTargetId);
