@@ -1,0 +1,169 @@
+"""The iklem HTTP server — exposes the agent as a JSON API.
+
+This is the backend for the desktop app (and any other client). It is
+stdlib-only (http.server) so it runs anywhere with no dependencies. Endpoints:
+
+  GET  /health            -> {"ok": true, "version": ...}
+  GET  /sessions          -> list of sessions
+  POST /sessions          -> create a session
+  GET  /sessions/<id>     -> messages in a session
+  POST /sessions/<id>/chat -> send a message, get the agent's reply
+  GET  /config            -> current config (redacted)
+  POST /config            -> update config
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import threading
+import uuid
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any
+
+from iklem.core.agent import Agent
+from iklem.providers.base import Message
+
+
+class SessionManager:
+    """Holds multiple named conversations, each with its own agent."""
+
+    def __init__(self) -> None:
+        self._sessions: dict[str, dict[str, Any]] = {}
+        self._lock = threading.Lock()
+
+    def create(self, title: str = "New session") -> str:
+        sid = uuid.uuid4().hex[:12]
+        with self._lock:
+            self._sessions[sid] = {
+                "id": sid,
+                "title": title,
+                "agent": _make_agent(),
+                "messages": [],
+            }
+        return sid
+
+    def list(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [
+                {"id": s["id"], "title": s["title"], "count": len(s["messages"])}
+                for s in self._sessions.values()
+            ]
+
+    def get(self, sid: str) -> dict[str, Any] | None:
+        with self._lock:
+            return self._sessions.get(sid)
+
+    def chat(self, sid: str, text: str) -> dict[str, Any]:
+        session = self.get(sid)
+        if session is None:
+            return {"error": "session not found"}
+        agent: Agent = session["agent"]
+        result = agent.respond(text)
+        if not result.ok:
+            return {"error": result.error}
+        session["messages"].append({"role": "user", "content": text})
+        session["messages"].append({"role": "assistant", "content": result.content})
+        return {"reply": result.content}
+
+
+def _make_agent() -> Agent:
+    from iklem.providers.ollama import OllamaProvider
+
+    return Agent(provider=OllamaProvider())
+
+
+def _read_config() -> dict[str, str]:
+    """Return the current config, redacting secrets."""
+    keys = [
+        "IKLEM_OLLAMA_MODEL",
+        "IKLEM_OLLAMA_URL",
+        "IKLEM_NODE_ID",
+        "IKLEM_RELAY_URL",
+    ]
+    config = {}
+    for k in keys:
+        v = os.environ.get(k)
+        if v:
+            config[k] = v
+    # Redact any token-like values.
+    for k in list(config):
+        if "TOKEN" in k or "SECRET" in k or "KEY" in k:
+            config[k] = "•••"
+    return config
+
+
+def make_handler(manager: SessionManager) -> type[BaseHTTPRequestHandler]:
+    class Handler(BaseHTTPRequestHandler):
+        def _json(self, obj: Any, status: int = 200) -> None:
+            body = json.dumps(obj).encode("utf-8")
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+
+        def _read_body(self) -> dict:
+            length = int(self.headers.get("Content-Length", 0))
+            if length == 0:
+                return {}
+            return json.loads(self.rfile.read(length).decode("utf-8"))
+
+        def do_OPTIONS(self) -> None:
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.end_headers()
+
+        def do_GET(self) -> None:
+            if self.path == "/health":
+                self._json({"ok": True, "version": "0.1.0"})
+            elif self.path == "/sessions":
+                self._json(manager.list())
+            elif self.path == "/config":
+                self._json(_read_config())
+            elif self.path.startswith("/sessions/"):
+                sid = self.path.split("/")[2]
+                session = manager.get(sid)
+                if session is None:
+                    self._json({"error": "session not found"}, 404)
+                else:
+                    self._json(session["messages"])
+            else:
+                self._json({"error": "not found"}, 404)
+
+        def do_POST(self) -> None:
+            if self.path == "/sessions":
+                body = self._read_body()
+                sid = manager.create(title=body.get("title", "New session"))
+                self._json({"id": sid})
+            elif self.path.endswith("/chat"):
+                parts = self.path.split("/")
+                sid = parts[2]
+                body = self._read_body()
+                result = manager.chat(sid, body.get("text", ""))
+                if "error" in result:
+                    self._json(result, 404)
+                else:
+                    self._json(result)
+            else:
+                self._json({"error": "not found"}, 404)
+
+        def log_message(self, *args) -> None:
+            pass
+
+    return Handler
+
+
+def serve(host: str = "127.0.0.1", port: int = 8787) -> None:
+    manager = SessionManager()
+    server = HTTPServer((host, port), make_handler(manager))
+    print(f"✓ iklem server listening on http://{host}:{port}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()

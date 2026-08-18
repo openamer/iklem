@@ -26,6 +26,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--swarm-relay", action="store_true", help="run a local swarm relay")
     p.add_argument("--swarm-publish", nargs=2, metavar=("KIND", "CONTENT"), help="sign and publish a packet to the relay")
     p.add_argument("--swarm-list", action="store_true", help="list packets from the relay")
+    p.add_argument("--server", action="store_true", help="run the HTTP server (desktop app backend)")
     p.add_argument("ask", nargs="*", help="ask a question (non-interactive)")
     return p
 
@@ -130,6 +131,12 @@ def main(argv: list[str] | None = None) -> int:
         for pkt in packets:
             verified = "✓" if node.verify(pkt) else "✗ tampered"
             print(f"  [{verified}] {pkt.node_id}/{pkt.kind}: {pkt.content[:60]}")
+        return 0
+
+    if args.server:
+        from iklem.server import serve
+
+        serve()
         return 0
 
     if args.ask:

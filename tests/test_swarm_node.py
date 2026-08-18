@@ -30,8 +30,8 @@ def test_node_rejects_foreign_secret():
     assert not b.verify(pkt)
 
 
-def test_relay_roundtrip():
-    store = _RelayStore()
+def test_relay_roundtrip(tmp_path):
+    store = _RelayStore(data_file=tmp_path / "relay.json")
     server = _start_relay(store)
     try:
         port = server.server_address[1]
