@@ -22,13 +22,14 @@ architecture, then adds its own axis.
 
 **iklem does not break, and it provably improves with use.**
 
-- **Does not break** — every state-changing operation (update, install, sync)
-  verifies before it claims and reports real errors instead of inventing
-  results. Self-update is hardened against file-locks, interrupted installs,
-  and stale recovery markers.
-- **Provably improves** — learning is observable, not a slogan. Memory persists
-  across sessions, skills are distilled from hard tasks and refined on reuse,
-  and the swarm shares curated, signed, leak-free knowledge between nodes.
+- **Does not break** — every state-changing operation verifies before it
+  claims and reports real errors instead of inventing results. A tool that
+  fails returns an honest error; the agent never fabricates a fact it can
+  look up.
+- **Provably improves** — learning is observable, not a slogan. Memory and
+  conversation history persist across sessions, skills are distilled from
+  hard tasks and refined on reuse, and the swarm shares curated, signed,
+  leak-free knowledge between nodes.
 
 ## Architecture principles
 
@@ -39,8 +40,8 @@ architecture, then adds its own axis.
    hard-codes a specific channel or tool.
 3. **Verification over fabrication.** Every operation that mutates state
    returns a verifiable result. The agent never claims success it cannot prove.
-4. **Prompt-cache safety.** A long-lived conversation reuses a cached prefix.
-   Nothing mutates past context or rebuilds the system prompt mid-conversation.
+4. **Grounding over guessing.** The agent calls tools to learn facts (date,
+   time, system info, web, shell) instead of hallucinating them.
 5. **Privacy by default.** Secrets and PII are redacted before anything is
    stored or shared.
 
@@ -49,33 +50,62 @@ architecture, then adds its own axis.
 ```
 iklem/
 ├── iklem/
-│   ├── core/            # the narrow waist — runtime, loop, context
-│   │   ├── runtime.py   #   plugin discovery + lifecycle
-│   │   ├── loop.py      #   the agent loop (turn → tools → result)
-│   │   └── context.py   #   system prompt, cache-safe context assembly
+│   ├── core/            # the narrow waist
+│   │   ├── runtime.py   #   wires memory + plugins together
+│   │   └── agent.py     #   the agent loop (turn → tools → grounded answer)
 │   ├── memory/          # the learning loop (from hermes)
 │   │   ├── store.py     #   durable memory across sessions
+│   │   ├── history.py   #   persistent conversation history
 │   │   └── skills.py    #   skill distillation + refinement
+│   ├── providers/       # model backends (plugins)
+│   │   ├── base.py      #   Provider ABC + Message/Result types
+│   │   ├── ollama.py    #   local Ollama (native tool calling)
+│   │   └── openai_compatible.py  # OpenAI/OpenRouter
+│   ├── tools/           # the agent's capabilities (plugins)
+│   │   ├── registry.py  #   the full tool set
+│   │   ├── system.py    #   date/time/system/file tools
+│   │   ├── web.py       #   fetch_url + Wikipedia search
+│   │   ├── shell.py     #   run_command + open_app
+│   │   └── memory.py    #   remember/recall/list_memories
 │   ├── gateway/         # platform breadth (from openclaw)
 │   │   ├── base.py      #   channel adapter ABC
-│   │   └── cli.py       #   the CLI channel (first, simplest)
+│   │   ├── telegram.py  #   Telegram channel
+│   │   ├── slack.py     #   Slack channel
+│   │   └── discord.py   #   Discord channel
+│   ├── swarm/           # nodes share signed knowledge
+│   │   ├── packet.py    #   signed, leak-free knowledge packets
+│   │   ├── node.py      #   node identity + sign/verify
+│   │   └── relay.py     #   untrusted HTTP store-and-forward relay
 │   ├── plugins/         # everything is a plugin (from deepseek-harness)
-│   │   └── manifest.py  #   plugin manifest + registry
+│   │   ├── manifest.py  #   plugin manifest + registry
+│   │   └── discovery.py #   runtime plugin loading from a directory
 │   └── verify/          # the "does not break" axis
 │       └── checks.py    #   pre/post condition checks, honest error reporting
+├── tests/               # 37 tests, all green
+├── .github/workflows/   # CI (runs tests on push/PR)
 ├── pyproject.toml
 ├── README.md
 └── ARCHITECTURE.md      # this file
 ```
 
-## The first milestone (what we build now)
+## What works today
 
-A **working core** that proves the architecture, not a clone of anything:
+- **Think** — a local Ollama model (private, offline) or any OpenAI-compatible
+  endpoint. Default is a cloud model for reliable tool-calling.
+- **Act** — the agent calls tools (date, time, system, web, shell, open_app)
+  and answers from real data, not guesses.
+- **Learn** — memory and conversation history persist across sessions; a fresh
+  session recalls what it was told before.
+- **Share** — the swarm exchanges signed, verifiable knowledge packets over an
+  untrusted relay.
+- **Reach you** — CLI, Telegram, Slack, and Discord channels, all as plugins.
+- **Extend** — channels, tools, and providers are plugins; new plugins are
+  discovered at runtime from a directory.
 
-1. A CLI you can actually run (`iklem`).
-2. A plugin system where a channel and a tool are both plugins.
-3. A memory store that persists across sessions.
-4. A verify layer that reports real errors instead of fabricating results.
+## What is next
 
-This is deliberately small. It is the foundation on which the full vision
-(channels, swarm, brain) is built — one verified step at a time.
+1. **More tools** — richer capabilities (structured web search, code execution
+   sandbox, calendar/email).
+2. **A real gateway** — a single process that fans out to all channels.
+3. **Skill distillation** — automatically turn hard tasks into reusable skills.
+4. **Swarm transport** — a public relay so nodes can share beyond localhost.

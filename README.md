@@ -25,20 +25,22 @@ architecture, then adds its own axis.
 
 ## What it can do today
 
-- **Think** — a local Ollama model (private, offline, no API key). Default
-  `qwen3:1.7b` answers in ~2s; the "thinking" block is disabled by default to
-  avoid CPU latency.
-- **Learn** — durable memory and skills that persist across sessions.
+- **Think** — a local Ollama model (private, offline) or any OpenAI-compatible
+  endpoint. Default is a cloud model for reliable tool-calling.
+- **Act** — the agent calls tools (date, time, system info, web search, shell
+  commands, open apps) and answers from real data, not guesses.
+- **Learn** — memory and conversation history persist across sessions; a fresh
+  session recalls what it was told before.
 - **Share** — a swarm of nodes exchanging signed, verifiable knowledge packets
   over an untrusted relay.
 - **Reach you** — CLI, Telegram, Slack, and Discord channels, all as plugins.
-- **Extend** — channels, providers, and tools are all plugins; the core stays
-  narrow.
+- **Extend** — channels, providers, and tools are plugins; new plugins are
+  discovered at runtime from a directory.
 
 ## Install
 
 ```bash
-pip install -e .
+pip install -e ".[dev]"
 ```
 
 ## Run
@@ -59,9 +61,11 @@ iklem --swarm-list             # list + verify packets
 
 | Variable | Purpose |
 |---|---|
-| `IKLEM_OLLAMA_MODEL` | local model (default `qwen3:1.7b`) |
+| `IKLEM_OLLAMA_MODEL` | model (default `deepseek-v4-flash:cloud`) |
 | `IKLEM_OLLAMA_URL` | Ollama endpoint (default `http://localhost:11434`) |
 | `IKLEM_API_KEY` / `IKLEM_BASE_URL` / `IKLEM_MODEL` | OpenAI-compatible provider |
+| `IKLEM_HOME` | data directory (memory, history, plugins) |
+| `IKLEM_PLUGIN_DIR` | plugin directory (default `~/.iklem/plugins`) |
 | `IKLEM_TELEGRAM_TOKEN` | Telegram bot token |
 | `IKLEM_SLACK_TOKEN` / `IKLEM_SLACK_CHANNEL` | Slack bot |
 | `IKLEM_DISCORD_TOKEN` / `IKLEM_DISCORD_CHANNEL` | Discord bot |
