@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import code, memory, shell, skills, system, web
+from iklem.tools import code, memory, selfextend, shell, skills, system, web
 
 
 @dataclass(frozen=True)
@@ -22,8 +22,8 @@ class Tool:
         return self.fn(*args, **kwargs)
 
 
-def all_tools() -> list[Tool]:
-    """The complete tool set available to the agent."""
+def _builtin_tools() -> list[Tool]:
+    """The built-in tool set."""
     return [
         Tool(name="current_time", description="Current local time (HH:MM:SS).", fn=system.current_time),
         Tool(name="current_date", description="Today's date (ISO, e.g. 2026-08-18).", fn=system.current_date),
@@ -45,7 +45,23 @@ def all_tools() -> list[Tool]:
         Tool(name="get_skill", description="Retrieve a saved skill's steps by name.", fn=skills.get_skill),
         Tool(name="echo", description="Return the input unchanged.", fn=lambda text: text),
         Tool(name="word_count", description="Count words in a string.", fn=lambda text: str(len(text.split()))),
+        Tool(name="self_extend", description="Create a new tool from Python code (sandboxed + verified).", fn=selfextend.self_extend),
     ]
+
+
+def _extension_tools() -> list[Tool]:
+    """Load self-created tools from the sandbox (verified, rolled back on failure)."""
+    from iklem.selfextend import load_extensions
+
+    tools = []
+    for name, description, fn in load_extensions():
+        tools.append(Tool(name=name, description=description, fn=fn))
+    return tools
+
+
+def all_tools() -> list[Tool]:
+    """The complete tool set: built-ins plus self-created extensions."""
+    return _builtin_tools() + _extension_tools()
 
 
 def tool_by_name(name: str) -> Tool | None:
