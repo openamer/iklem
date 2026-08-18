@@ -23,7 +23,8 @@
       "preload.js",
       "index.html",
       "styles.css",
-      "renderer.js"
+      "renderer.js",
+      "markdown.js"
     ],
     "win": {
       "icon": "icon.ico",

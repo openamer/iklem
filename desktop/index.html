@@ -43,12 +43,20 @@
       <input id="cfg-model" type="text" placeholder="deepseek-v4-flash:cloud" />
       <label>Ollama URL</label>
       <input id="cfg-url" type="text" placeholder="http://localhost:11434" />
+      <p class="hint">Changes apply to new sessions.</p>
       <div class="modal-actions">
         <button id="settings-close" class="secondary">Close</button>
       </div>
     </div>
   </div>
 
+  <!-- Session context menu -->
+  <div class="context-menu hidden" id="context-menu">
+    <button id="ctx-rename">Rename</button>
+    <button id="ctx-delete" class="danger">Delete</button>
+  </div>
+
+  <script src="markdown.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

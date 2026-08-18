@@ -82,6 +82,41 @@ class OllamaProvider(Provider):
         content = message.get("content", "")
         return ProviderResult(content=content, ok=True, tool_calls=tool_calls)
 
+    def stream(self, messages: list[Message]) -> "object":
+        """Yield content tokens as they arrive (stream=true).
+
+        Returns a generator of str chunks. Tool calls are not supported in
+        streaming mode; callers should use complete() for tool-calling.
+        """
+        payload: dict = {
+            "model": self.model,
+            "messages": [self._to_ollama(m) for m in messages],
+            "stream": True,
+            "think": self.think,
+        }
+        req = urllib.request.Request(
+            f"{self.base_url}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            resp = urllib.request.urlopen(req, timeout=300)
+        except urllib.error.URLError as e:
+            yield f"(error: {e.reason})"
+            return
+        for raw in resp:
+            line = raw.decode("utf-8", "replace").strip()
+            if not line:
+                continue
+            try:
+                chunk = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            piece = chunk.get("message", {}).get("content", "")
+            if piece:
+                yield piece
+
     @staticmethod
     def _to_ollama(m: Message) -> dict:
         msg: dict = {"role": m.role, "content": m.content}

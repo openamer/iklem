@@ -116,6 +116,37 @@ body {
 .msg.assistant { align-self: flex-start; background: var(--assistant-bubble); border-bottom-left-radius: 4px; }
 .msg.error { align-self: flex-start; background: #2d1518; color: var(--danger); }
 
+/* Markdown inside assistant messages */
+.msg.assistant p { margin: 0 0 8px; }
+.msg.assistant p:last-child { margin-bottom: 0; }
+.msg.assistant h1, .msg.assistant h2, .msg.assistant h3, .msg.assistant h4 { margin: 12px 0 6px; font-size: 1.1em; }
+.msg.assistant ul { margin: 0 0 8px; padding-left: 20px; }
+.msg.assistant li { margin: 2px 0; }
+.msg.assistant code {
+  background: rgba(110, 118, 129, 0.4);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-family: "SF Mono", Consolas, monospace;
+  font-size: 13px;
+}
+.msg.assistant pre {
+  background: #0d1117;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+.msg.assistant pre code {
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  white-space: pre;
+}
+.msg.assistant a { color: var(--accent); text-decoration: none; }
+.msg.assistant a:hover { text-decoration: underline; }
+.msg.assistant strong { font-weight: 600; }
+
 /* Composer */
 .composer {
   display: flex;
@@ -177,6 +208,7 @@ body {
   border-radius: 6px;
   font-size: 14px;
 }
+.modal-card .hint { font-size: 12px; color: var(--text-dim); margin-top: 12px; }
 .modal-actions { margin-top: 20px; display: flex; justify-content: flex-end; }
 .secondary {
   padding: 8px 16px;
@@ -187,3 +219,30 @@ body {
   cursor: pointer;
 }
 .secondary:hover { border-color: var(--accent); }
+
+/* Context menu */
+.context-menu {
+  position: fixed;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 20;
+  min-width: 120px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+}
+.context-menu.hidden { display: none; }
+.context-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.context-menu button:hover { background: var(--bg); }
+.context-menu button.danger { color: var(--danger); }

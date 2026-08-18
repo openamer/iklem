@@ -54,6 +54,21 @@ class SessionManager:
         with self._lock:
             return self._sessions.get(sid)
 
+    def rename(self, sid: str, title: str) -> bool:
+        session = self.get(sid)
+        if session is None:
+            return False
+        with self._lock:
+            session["title"] = title
+        return True
+
+    def delete(self, sid: str) -> bool:
+        with self._lock:
+            if sid not in self._sessions:
+                return False
+            del self._sessions[sid]
+            return True
+
     def chat(self, sid: str, text: str) -> dict[str, Any]:
         session = self.get(sid)
         if session is None:
@@ -65,6 +80,30 @@ class SessionManager:
         session["messages"].append({"role": "user", "content": text})
         session["messages"].append({"role": "assistant", "content": result.content})
         return {"reply": result.content}
+
+    def stream_chat(self, sid: str, text: str):
+        """Yield reply chunks for a streaming response (no tool-calling)."""
+        session = self.get(sid)
+        if session is None:
+            yield "(error: session not found)"
+            return
+        agent: Agent = session["agent"]
+        provider = agent.provider
+        if not hasattr(provider, "stream"):
+            # Fall back to a single non-streamed reply.
+            result = agent.respond(text)
+            yield result.content if result.ok else f"(error: {result.error})"
+            return
+        messages = [Message(role="system", content=agent.system_prompt)]
+        messages.extend(agent.history)
+        messages.append(Message(role="user", content=text))
+        full = []
+        for chunk in provider.stream(messages):
+            full.append(chunk)
+            yield chunk
+        reply = "".join(full)
+        session["messages"].append({"role": "user", "content": text})
+        session["messages"].append({"role": "assistant", "content": reply})
 
 
 def _make_agent() -> Agent:
@@ -113,7 +152,7 @@ def make_handler(manager: SessionManager) -> type[BaseHTTPRequestHandler]:
         def do_OPTIONS(self) -> None:
             self.send_response(204)
             self.send_header("Access-Control-Allow-Origin", "*")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.end_headers()
 
@@ -139,6 +178,18 @@ def make_handler(manager: SessionManager) -> type[BaseHTTPRequestHandler]:
                 body = self._read_body()
                 sid = manager.create(title=body.get("title", "New session"))
                 self._json({"id": sid})
+            elif self.path.endswith("/stream"):
+                parts = self.path.split("/")
+                sid = parts[2]
+                body = self._read_body()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                for chunk in manager.stream_chat(sid, body.get("text", "")):
+                    self.wfile.write(chunk.encode("utf-8"))
+                    self.wfile.flush()
             elif self.path.endswith("/chat"):
                 parts = self.path.split("/")
                 sid = parts[2]
@@ -148,6 +199,31 @@ def make_handler(manager: SessionManager) -> type[BaseHTTPRequestHandler]:
                     self._json(result, 404)
                 else:
                     self._json(result)
+            else:
+                self._json({"error": "not found"}, 404)
+
+        def do_PATCH(self) -> None:
+            # PATCH /sessions/<id>  -> rename
+            parts = self.path.split("/")
+            if len(parts) == 3 and parts[1] == "sessions":
+                sid = parts[2]
+                body = self._read_body()
+                if manager.rename(sid, body.get("title", "")):
+                    self._json({"ok": True})
+                else:
+                    self._json({"error": "session not found"}, 404)
+            else:
+                self._json({"error": "not found"}, 404)
+
+        def do_DELETE(self) -> None:
+            # DELETE /sessions/<id>  -> delete
+            parts = self.path.split("/")
+            if len(parts) == 3 and parts[1] == "sessions":
+                sid = parts[2]
+                if manager.delete(sid):
+                    self._json({"ok": True})
+                else:
+                    self._json({"error": "session not found"}, 404)
             else:
                 self._json({"error": "not found"}, 404)
 
