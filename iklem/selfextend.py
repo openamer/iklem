@@ -53,6 +53,13 @@ def write_extension(name: str, code: str) -> tuple[bool, str]:
 def _verify(path: Path, name: str) -> tuple[bool, str]:
     """Import a candidate extension and check it has the right shape."""
     module_name = f"iklem_selfext_{name}"
+    # Invalidate any cached module AND its bytecode cache, so a fixed
+    # extension is re-imported fresh (otherwise the old .pyc wins).
+    sys.modules.pop(module_name, None)
+    pycache = path.parent / "__pycache__"
+    if pycache.is_dir():
+        for stale in pycache.glob(f"{name}.*.pyc"):
+            stale.unlink(missing_ok=True)
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         return (False, "could not load module")
@@ -89,3 +96,55 @@ def load_extensions() -> list[tuple[str, str, object]]:
             if module is not None:
                 loaded.append((name, description, module.run))
     return loaded
+
+
+def list_extensions() -> list[tuple[str, str]]:
+    """List all extension files as (name, description) — including broken ones."""
+    directory = _extensions_dir()
+    if not directory.is_dir():
+        return []
+    result = []
+    for path in sorted(directory.glob("*.py")):
+        if path.name.startswith("."):
+            continue
+        name = path.stem
+        ok, description = _verify(path, name)
+        result.append((name, description if ok else f"(broken: {description})"))
+    return result
+
+
+def read_extension(name: str) -> str | None:
+    """Return the source code of an extension, or None if it does not exist."""
+    if not name or not name.replace("_", "").isalnum():
+        return None
+    path = _extensions_dir() / f"{name}.py"
+    if not path.exists():
+        return None
+    return path.read_text(encoding="utf-8")
+
+
+def fix_extension(name: str, code: str) -> tuple[bool, str]:
+    """Rewrite an existing extension, verify it, and roll back on failure.
+
+    This is how the agent fixes a bug in a tool it created: it reads the
+    source, rewrites it, and the new version is only promoted if it verifies.
+    A broken fix is rolled back, leaving the previous version intact.
+    """
+    if not name or not name.replace("_", "").isalnum():
+        return (False, f"invalid tool name: {name!r}")
+
+    directory = _extensions_dir()
+    path = directory / f"{name}.py"
+    if not path.exists():
+        return (False, f"tool '{name}' does not exist")
+
+    # Write the candidate to a temp file and verify before promoting.
+    tmp = directory / f".{name}.tmp.py"
+    tmp.write_text(code, encoding="utf-8")
+    ok, message = _verify(tmp, name)
+    if not ok:
+        tmp.unlink(missing_ok=True)
+        return (False, f"fix rejected (previous version kept): {message}")
+
+    os.replace(tmp, path)
+    return (True, f"tool '{name}' fixed and verified")

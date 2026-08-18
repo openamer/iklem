@@ -46,6 +46,9 @@ def _builtin_tools() -> list[Tool]:
         Tool(name="echo", description="Return the input unchanged.", fn=lambda text: text),
         Tool(name="word_count", description="Count words in a string.", fn=lambda text: str(len(text.split()))),
         Tool(name="self_extend", description="Create a new tool from Python code (sandboxed + verified).", fn=selfextend.self_extend),
+        Tool(name="list_my_tools", description="List the tools I created myself.", fn=selfextend.list_my_tools),
+        Tool(name="read_my_tool", description="Return the source code of one of my self-created tools.", fn=selfextend.read_my_tool),
+        Tool(name="fix_my_tool", description="Rewrite one of my self-created tools to fix a bug (verified + rollback).", fn=selfextend.fix_my_tool),
     ]
 
 
