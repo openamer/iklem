@@ -41,3 +41,25 @@ def run_command(command: str) -> str:
     else:
         combined += f"\n(exit code {proc.returncode})"
     return combined
+
+
+def open_app(name: str) -> str:
+    """Open/launch an application by name (e.g. 'brave', 'notepad', 'calculator').
+
+    Uses the Windows `start` command. Returns a confirmation or an error.
+    """
+    try:
+        proc = subprocess.run(
+            f'start "" "{name}"',
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+    except subprocess.TimeoutExpired:
+        return "(launch timed out)"
+    except Exception as e:  # noqa: BLE001
+        return f"(launch error: {e})"
+    if proc.returncode == 0:
+        return f"launched {name}"
+    return f"(failed to launch {name}: {proc.stderr.strip() or 'unknown error'})"

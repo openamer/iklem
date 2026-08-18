@@ -34,6 +34,7 @@ def all_tools() -> list[Tool]:
         Tool(name="fetch_url", description="Fetch a URL and return its text.", fn=web.fetch_url),
         Tool(name="search_web", description="Search Wikipedia and return result summaries.", fn=web.search_wikipedia),
         Tool(name="run_command", description="Run a shell command and return its output.", fn=shell.run_command),
+        Tool(name="open_app", description="Open/launch an application by name (e.g. 'brave', 'notepad').", fn=shell.open_app),
         Tool(name="echo", description="Return the input unchanged.", fn=lambda text: text),
         Tool(name="word_count", description="Count words in a string.", fn=lambda text: str(len(text.split()))),
     ]
