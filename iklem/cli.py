@@ -78,11 +78,9 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.gateway:
-        from iklem.gateway.telegram import TelegramChannel
+        from iklem.gateway.gateway import run_gateway
 
-        channel = TelegramChannel()
-        channel.start(_make_agent())
-        return 0
+        return run_gateway(_make_agent())
 
     if args.swarm_sign:
         from iklem.swarm.packet import KnowledgePacket, is_leak_free

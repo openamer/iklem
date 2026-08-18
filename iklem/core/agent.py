@@ -57,6 +57,8 @@ class Agent:
         "list directories, fetch URLs, search Wikipedia, run shell commands, "
         "open/launch applications (open_app), and remember/recall facts "
         "(remember, recall, list_memories). "
+        "You can also save and reuse procedures as skills (save_skill, "
+        "list_skills, get_skill). "
         "You MUST call a tool to learn any fact about the real world — the "
         "current date, time, system information, or file contents. Never guess "
         "or invent a date, time, or fact. If a tool exists for the request, "

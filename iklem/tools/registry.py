@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import memory, shell, system, web
+from iklem.tools import memory, shell, skills, system, web
 
 
 @dataclass(frozen=True)
@@ -38,6 +38,9 @@ def all_tools() -> list[Tool]:
         Tool(name="remember", description="Persist a fact under a key so it survives across sessions.", fn=memory.remember),
         Tool(name="recall", description="Retrieve a previously remembered fact by key.", fn=memory.recall),
         Tool(name="list_memories", description="List all remembered keys.", fn=memory.list_memories),
+        Tool(name="save_skill", description="Save a reusable procedure (name, description, newline-separated steps).", fn=skills.save_skill),
+        Tool(name="list_skills", description="List all saved skills with descriptions.", fn=skills.list_skills),
+        Tool(name="get_skill", description="Retrieve a saved skill's steps by name.", fn=skills.get_skill),
         Tool(name="echo", description="Return the input unchanged.", fn=lambda text: text),
         Tool(name="word_count", description="Count words in a string.", fn=lambda text: str(len(text.split()))),
     ]
