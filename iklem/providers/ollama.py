@@ -24,7 +24,7 @@ class OllamaProvider(Provider):
         base_url: str | None = None,
         think: bool = False,
     ) -> None:
-        self.model = model or os.environ.get("IKLEM_OLLAMA_MODEL", "qwen3:1.7b")
+        self.model = model or os.environ.get("IKLEM_OLLAMA_MODEL", "deepseek-v4-flash:cloud")
         self.base_url = (
             base_url or os.environ.get("IKLEM_OLLAMA_URL", "http://localhost:11434")
         ).rstrip("/")
