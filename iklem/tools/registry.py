@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import code, memory, selfextend, shell, skills, system, web
+from iklem.tools import code, memory, selfextend, selfmodify, shell, skills, system, web
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,7 @@ def _builtin_tools() -> list[Tool]:
         Tool(name="list_my_tools", description="List the tools I created myself.", fn=selfextend.list_my_tools),
         Tool(name="read_my_tool", description="Return the source code of one of my self-created tools.", fn=selfextend.read_my_tool),
         Tool(name="fix_my_tool", description="Rewrite one of my self-created tools to fix a bug (verified + rollback).", fn=selfextend.fix_my_tool),
+        Tool(name="self_modify", description="Modify a core file, gated by the test suite (rollback on failure).", fn=selfmodify.self_modify_tool),
     ]
 
 
