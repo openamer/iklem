@@ -1,6 +1,8 @@
-// A minimal, dependency-free Markdown renderer for the chat UI.
-// Supports: code blocks (```), inline code (`), bold (**), italics (*),
-// headings (#), lists (-/*), and links. Safe: escapes HTML first.
+// A dependency-free Markdown renderer for the chat UI.
+// Supports: code blocks (```lang) with a language label, inline code (`),
+// bold (**), italics (*), headings (#), ordered/unordered lists, task lists
+// (- [ ] / - [x]), tables, blockquotes (>), horizontal rules (---), and
+// links. Safe: escapes HTML first. Status markers (✓/✗) are colorized.
 
 function escapeHtml(s) {
   return s
@@ -19,11 +21,13 @@ function renderInline(text) {
   s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   // links [text](url)
   s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+  // status markers: ✓ green, ✗ red
+  s = s.replace(/✓/g, '<span class="ok-mark">✓</span>');
+  s = s.replace(/✗/g, '<span class="err-mark">✗</span>');
   return s;
 }
 
-// A lightweight syntax highlighter for code blocks. Detects the language
-// from the ```lang fence and applies token classes for common languages.
+// A lightweight syntax highlighter for code blocks.
 function highlightCode(code, lang) {
   const escaped = escapeHtml(code);
   if (!lang) return escaped;
@@ -52,6 +56,29 @@ function highlightCode(code, lang) {
   return escaped;
 }
 
+function renderTable(rows) {
+  // rows: array of arrays of cell strings (already split on |)
+  if (rows.length < 2) return null;
+  const header = rows[0];
+  const body = rows.slice(1);
+  let html = '<table><thead><tr>';
+  for (const cell of header) {
+    html += `<th>${renderInline(cell.trim())}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+  for (const row of body) {
+    // skip separator rows like |---|---|
+    if (row.every((c) => /^:?-{2,}:?$/.test(c.trim()))) continue;
+    html += '<tr>';
+    for (const cell of row) {
+      html += `<td>${renderInline(cell.trim())}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  return html;
+}
+
 function renderMarkdown(md) {
   const lines = md.split('\n');
   let html = '';
@@ -59,11 +86,27 @@ function renderMarkdown(md) {
   let codeBuf = [];
   let codeLang = '';
   let inList = false;
+  let listType = 'ul';
+  let inQuote = false;
+  let tableBuf = [];
 
   const closeList = () => {
     if (inList) {
-      html += '</ul>';
+      html += `</${listType}>`;
       inList = false;
+    }
+  };
+  const closeQuote = () => {
+    if (inQuote) {
+      html += '</blockquote>';
+      inQuote = false;
+    }
+  };
+  const flushTable = () => {
+    if (tableBuf.length) {
+      const t = renderTable(tableBuf);
+      if (t) html += t;
+      tableBuf = [];
     }
   };
 
@@ -72,12 +115,15 @@ function renderMarkdown(md) {
     const fence = line.trim().match(/^```(\w*)/);
     if (fence) {
       if (inCode) {
-        html += '<pre><code>' + highlightCode(codeBuf.join('\n'), codeLang) + '</code></pre>';
+        const label = codeLang ? `<span class="code-lang">${escapeHtml(codeLang)}</span>` : '';
+        html += `<div class="code-block">${label}<pre><code>${highlightCode(codeBuf.join('\n'), codeLang)}</code></pre></div>`;
         codeBuf = [];
         codeLang = '';
         inCode = false;
       } else {
         closeList();
+        closeQuote();
+        flushTable();
         inCode = true;
         codeLang = fence[1] || '';
       }
@@ -88,21 +134,84 @@ function renderMarkdown(md) {
       continue;
     }
 
+    // table row (contains | and not a code fence)
+    if (line.includes('|')) {
+      closeList();
+      closeQuote();
+      tableBuf.push(line.split('|').map((c) => c.trim()));
+      continue;
+    } else if (tableBuf.length) {
+      flushTable();
+    }
+
     // heading
     const h = line.match(/^(#{1,4})\s+(.*)/);
     if (h) {
       closeList();
+      closeQuote();
       const level = h[1].length;
       html += `<h${level}>${renderInline(h[2])}</h${level}>`;
       continue;
     }
 
-    // list item
+    // horizontal rule
+    if (/^\s*(-{3,}|\*{3,})\s*$/.test(line)) {
+      closeList();
+      closeQuote();
+      html += '<hr>';
+      continue;
+    }
+
+    // blockquote
+    const q = line.match(/^\s*>\s?(.*)/);
+    if (q) {
+      closeList();
+      if (!inQuote) {
+        html += '<blockquote>';
+        inQuote = true;
+      }
+      html += `<p>${renderInline(q[1])}</p>`;
+      continue;
+    } else if (inQuote) {
+      closeQuote();
+    }
+
+    // task list item
+    const task = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)/);
+    if (task) {
+      if (!inList || listType !== 'ul') {
+        closeList();
+        html += '<ul class="task-list">';
+        inList = true;
+        listType = 'ul';
+      }
+      const checked = task[1].toLowerCase() === 'x';
+      const box = checked ? '☑' : '☐';
+      html += `<li class="task-item${checked ? ' done' : ''}"><span class="task-box">${box}</span>${renderInline(task[2])}</li>`;
+      continue;
+    }
+
+    // ordered list item
+    const oli = line.match(/^\s*\d+\.\s+(.*)/);
+    if (oli) {
+      if (!inList || listType !== 'ol') {
+        closeList();
+        html += '<ol>';
+        inList = true;
+        listType = 'ol';
+      }
+      html += `<li>${renderInline(oli[1])}</li>`;
+      continue;
+    }
+
+    // unordered list item
     const li = line.match(/^\s*[-*]\s+(.*)/);
     if (li) {
-      if (!inList) {
+      if (!inList || listType !== 'ul') {
+        closeList();
         html += '<ul>';
         inList = true;
+        listType = 'ul';
       }
       html += `<li>${renderInline(li[1])}</li>`;
       continue;
@@ -111,17 +220,22 @@ function renderMarkdown(md) {
     // blank line
     if (line.trim() === '') {
       closeList();
+      closeQuote();
       continue;
     }
 
     // paragraph
     closeList();
+    closeQuote();
     html += `<p>${renderInline(line)}</p>`;
   }
 
   if (inCode) {
-    html += '<pre><code>' + highlightCode(codeBuf.join('\n'), codeLang) + '</code></pre>';
+    const label = codeLang ? `<span class="code-lang">${escapeHtml(codeLang)}</span>` : '';
+    html += `<div class="code-block">${label}<pre><code>${highlightCode(codeBuf.join('\n'), codeLang)}</code></pre></div>`;
   }
+  flushTable();
   closeList();
+  closeQuote();
   return html;
 }
