@@ -23,6 +23,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--skills", action="store_true", help="list skills")
     p.add_argument("--gateway", action="store_true", help="start the Telegram channel")
     p.add_argument("--swarm-sign", nargs=3, metavar=("NODE", "KIND", "CONTENT"), help="sign a knowledge packet")
+    p.add_argument("--swarm-relay", action="store_true", help="run a local swarm relay")
+    p.add_argument("--swarm-publish", nargs=2, metavar=("KIND", "CONTENT"), help="sign and publish a packet to the relay")
+    p.add_argument("--swarm-list", action="store_true", help="list packets from the relay")
     p.add_argument("ask", nargs="*", help="ask a question (non-interactive)")
     return p
 
@@ -92,6 +95,43 @@ def main(argv: list[str] | None = None) -> int:
         pkt.sign(os.environ.get("IKLEM_SWARM_SECRET", "dev-secret"))
         print(f"✓ signed packet (node={node}, kind={kind})")
         print(f"  signature: {pkt.signature[:16]}…")
+        return 0
+
+    if args.swarm_relay:
+        from iklem.swarm.relay import serve
+
+        serve()
+        return 0
+
+    if args.swarm_publish:
+        from iklem.swarm.node import Node, RelayClient
+        from iklem.swarm.packet import is_leak_free
+
+        kind, content = args.swarm_publish
+        if not is_leak_free(content):
+            print("✗ content looks like it contains a secret — refusing to publish")
+            return 1
+        node = Node.from_env()
+        pkt = node.sign(kind, content)
+        relay = RelayClient(os.environ.get("IKLEM_RELAY_URL", "http://127.0.0.1:8765"))
+        if relay.publish(pkt):
+            print(f"✓ published (node={node.node_id}, kind={kind})")
+            return 0
+        print("✗ publish failed — is the relay running? (iklem --swarm-relay)")
+        return 1
+
+    if args.swarm_list:
+        from iklem.swarm.node import Node, RelayClient
+
+        node = Node.from_env()
+        relay = RelayClient(os.environ.get("IKLEM_RELAY_URL", "http://127.0.0.1:8765"))
+        packets = relay.list()
+        if not packets:
+            print("(no packets on relay)")
+            return 0
+        for pkt in packets:
+            verified = "✓" if node.verify(pkt) else "✗ tampered"
+            print(f"  [{verified}] {pkt.node_id}/{pkt.kind}: {pkt.content[:60]}")
         return 0
 
     if args.ask:
