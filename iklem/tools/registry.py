@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import code, memory, selfextend, selfmodify, shell, skills, system, web
+from iklem.tools import code, git, memory, selfextend, selfmodify, shell, skills, system, web
 
 
 @dataclass(frozen=True)
@@ -50,6 +50,10 @@ def _builtin_tools() -> list[Tool]:
         Tool(name="read_my_tool", description="Return the source code of one of my self-created tools.", fn=selfextend.read_my_tool),
         Tool(name="fix_my_tool", description="Rewrite one of my self-created tools to fix a bug (verified + rollback).", fn=selfextend.fix_my_tool),
         Tool(name="self_modify", description="Modify a core file, gated by the test suite (rollback on failure).", fn=selfmodify.self_modify_tool),
+        Tool(name="git_status", description="Return the git status of the iklem repo.", fn=git.git_status),
+        Tool(name="git_diff", description="Return the uncommitted diff of the iklem repo.", fn=git.git_diff),
+        Tool(name="git_commit", description="Commit all changes with a message.", fn=git.git_commit),
+        Tool(name="git_push", description="Push committed changes to the remote.", fn=git.git_push),
     ]
 
 
