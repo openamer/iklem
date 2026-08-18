@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import browser, code, computer, cron, delegate, files, git, http, memory, process, selfextend, selfmodify, shell, skills, system, util, web
+from iklem.tools import browser, code, computer, cron, delegate, files, git, http, memory, process, selfextend, selfmodify, session, shell, skills, system, tts, util, vision, web
 
 
 @dataclass(frozen=True)
@@ -79,6 +79,10 @@ def _builtin_tools() -> list[Tool]:
         Tool(name="random_number", description="Return a random integer between low and high.", fn=util.random_number),
         Tool(name="list_processes", description="List running processes (name + PID).", fn=process.list_processes),
         Tool(name="kill_process", description="Terminate a process by its PID.", fn=process.kill_process),
+        Tool(name="search_sessions", description="Search past conversations and memories for a keyword.", fn=session.search_sessions),
+        Tool(name="describe_image", description="Describe the contents of an image file using a vision model.", fn=vision.describe_image),
+        Tool(name="speak", description="Convert text to speech and play it.", fn=tts.speak),
+        Tool(name="speak_to_file", description="Convert text to speech and save it to an audio file.", fn=tts.speak_to_file),
     ]
 
 
