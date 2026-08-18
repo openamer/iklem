@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import shell, system, web
+from iklem.tools import memory, shell, system, web
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,9 @@ def all_tools() -> list[Tool]:
         Tool(name="search_web", description="Search Wikipedia and return result summaries.", fn=web.search_wikipedia),
         Tool(name="run_command", description="Run a shell command and return its output.", fn=shell.run_command),
         Tool(name="open_app", description="Open/launch an application by name (e.g. 'brave', 'notepad').", fn=shell.open_app),
+        Tool(name="remember", description="Persist a fact under a key so it survives across sessions.", fn=memory.remember),
+        Tool(name="recall", description="Retrieve a previously remembered fact by key.", fn=memory.recall),
+        Tool(name="list_memories", description="List all remembered keys.", fn=memory.list_memories),
         Tool(name="echo", description="Return the input unchanged.", fn=lambda text: text),
         Tool(name="word_count", description="Count words in a string.", fn=lambda text: str(len(text.split()))),
     ]

@@ -8,6 +8,7 @@ until the model produces a final answer (or a safety cap is hit).
 
 from __future__ import annotations
 
+import inspect
 import json
 from dataclasses import dataclass, field
 
@@ -16,7 +17,20 @@ from iklem.tools.registry import all_tools, tool_by_name
 
 
 def _tool_schema(tool) -> dict:
-    """Build an OpenAI/Ollama-style tool schema from a Tool."""
+    """Build an OpenAI/Ollama-style tool schema from a Tool.
+
+    Parameter names and types are derived from the function signature so the
+    model knows exactly what arguments to pass.
+    """
+    sig = inspect.signature(tool.fn)
+    properties = {}
+    required = []
+    for name, param in sig.parameters.items():
+        if name in ("self", "cls"):
+            continue
+        properties[name] = {"type": "string"}
+        if param.default is inspect.Parameter.empty:
+            required.append(name)
     return {
         "type": "function",
         "function": {
@@ -24,7 +38,8 @@ def _tool_schema(tool) -> dict:
             "description": tool.description,
             "parameters": {
                 "type": "object",
-                "properties": {},
+                "properties": properties,
+                "required": required,
             },
         },
     }
@@ -39,12 +54,16 @@ class Agent:
         "You are iklem, a helpful personal AI agent with access to tools. "
         "You can: get the current date/time, read system info, read files, "
         "list directories, fetch URLs, search Wikipedia, run shell commands, "
-        "and open/launch applications (open_app). "
+        "open/launch applications (open_app), and remember/recall facts "
+        "(remember, recall, list_memories). "
         "You MUST call a tool to learn any fact about the real world — the "
         "current date, time, system information, or file contents. Never guess "
         "or invent a date, time, or fact. If a tool exists for the request, "
         "call it and answer from its result. Do not claim you cannot do "
-        "something that a tool can do."
+        "something that a tool can do. "
+        "When the user asks about themselves (their name, preferences, or "
+        "anything you may have been told before), call list_memories or recall "
+        "first before answering — do not say you do not know without checking."
     )
     history: list[Message] = field(default_factory=list)
     max_tool_rounds: int = 5
