@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import code, git, memory, selfextend, selfmodify, shell, skills, system, web
+from iklem.tools import browser, code, computer, cron, delegate, git, memory, selfextend, selfmodify, shell, skills, system, web
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,14 @@ def _builtin_tools() -> list[Tool]:
         Tool(name="git_diff", description="Return the uncommitted diff of the iklem repo.", fn=git.git_diff),
         Tool(name="git_commit", description="Commit all changes with a message.", fn=git.git_commit),
         Tool(name="git_push", description="Push committed changes to the remote.", fn=git.git_push),
+        Tool(name="cron_schedule", description="Schedule a command to run every N seconds.", fn=cron.cron_schedule),
+        Tool(name="cron_list", description="List all scheduled jobs.", fn=cron.cron_list),
+        Tool(name="cron_remove", description="Remove a scheduled job.", fn=cron.cron_remove),
+        Tool(name="delegate_task", description="Run a task in a fresh subagent and return its result.", fn=delegate.delegate_task),
+        Tool(name="browse", description="Open a URL in a real browser and return the rendered text.", fn=browser.browse),
+        Tool(name="screenshot", description="Take a screenshot and return its file path.", fn=computer.screenshot),
+        Tool(name="click", description="Click at screen coordinates (x, y).", fn=computer.click),
+        Tool(name="type_text", description="Type text at the current cursor position.", fn=computer.type_text),
     ]
 
 
