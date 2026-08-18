@@ -19,18 +19,67 @@ import os
 import threading
 import uuid
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
 from typing import Any
 
 from iklem.core.agent import Agent
 from iklem.providers.base import Message
 
 
-class SessionManager:
-    """Holds multiple named conversations, each with its own agent."""
+def _default_sessions_file() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("HOME") or "."
+    return Path(base) / "iklem" / "sessions.json"
 
-    def __init__(self) -> None:
+
+class SessionManager:
+    """Holds multiple named conversations, each with its own agent.
+
+    Sessions are persisted to disk (title + messages) so they survive a
+    server restart. Agent objects are recreated lazily on first use.
+    """
+
+    def __init__(self, data_file: Path | None = None) -> None:
         self._sessions: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
+        self._data_file = data_file or _default_sessions_file()
+        self._load()
+
+    def _load(self) -> None:
+        if not self._data_file.exists():
+            return
+        try:
+            data = json.loads(self._data_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        for item in data:
+            sid = item.get("id")
+            if not sid:
+                continue
+            self._sessions[sid] = {
+                "id": sid,
+                "title": item.get("title", "New session"),
+                "agent": None,  # recreated lazily
+                "messages": item.get("messages", []),
+            }
+
+    def _persist(self) -> None:
+        self._data_file.parent.mkdir(parents=True, exist_ok=True)
+        data = [
+            {
+                "id": s["id"],
+                "title": s["title"],
+                "messages": s["messages"],
+            }
+            for s in self._sessions.values()
+        ]
+        tmp = self._data_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        os.replace(tmp, self._data_file)
+
+    def _ensure_agent(self, session: dict[str, Any]) -> Agent:
+        if session["agent"] is None:
+            session["agent"] = _make_agent()
+        return session["agent"]
 
     def create(self, title: str = "New session") -> str:
         sid = uuid.uuid4().hex[:12]
@@ -41,6 +90,7 @@ class SessionManager:
                 "agent": _make_agent(),
                 "messages": [],
             }
+            self._persist()
         return sid
 
     def list(self) -> list[dict[str, Any]]:
@@ -60,6 +110,7 @@ class SessionManager:
             return False
         with self._lock:
             session["title"] = title
+            self._persist()
         return True
 
     def delete(self, sid: str) -> bool:
@@ -67,18 +118,21 @@ class SessionManager:
             if sid not in self._sessions:
                 return False
             del self._sessions[sid]
+            self._persist()
             return True
 
     def chat(self, sid: str, text: str) -> dict[str, Any]:
         session = self.get(sid)
         if session is None:
             return {"error": "session not found"}
-        agent: Agent = session["agent"]
+        agent: Agent = self._ensure_agent(session)
         result = agent.respond(text)
         if not result.ok:
             return {"error": result.error}
-        session["messages"].append({"role": "user", "content": text})
-        session["messages"].append({"role": "assistant", "content": result.content})
+        with self._lock:
+            session["messages"].append({"role": "user", "content": text})
+            session["messages"].append({"role": "assistant", "content": result.content})
+            self._persist()
         return {"reply": result.content}
 
     def stream_chat(self, sid: str, text: str):
@@ -87,7 +141,7 @@ class SessionManager:
         if session is None:
             yield "(error: session not found)"
             return
-        agent: Agent = session["agent"]
+        agent: Agent = self._ensure_agent(session)
         provider = agent.provider
         if not hasattr(provider, "stream"):
             # Fall back to a single non-streamed reply.
@@ -102,8 +156,10 @@ class SessionManager:
             full.append(chunk)
             yield chunk
         reply = "".join(full)
-        session["messages"].append({"role": "user", "content": text})
-        session["messages"].append({"role": "assistant", "content": reply})
+        with self._lock:
+            session["messages"].append({"role": "user", "content": text})
+            session["messages"].append({"role": "assistant", "content": reply})
+            self._persist()
 
 
 def _make_agent() -> Agent:

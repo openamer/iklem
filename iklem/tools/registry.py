@@ -33,6 +33,7 @@ def all_tools() -> list[Tool]:
         Tool(name="list_dir", description="List entries in a directory.", fn=system.list_dir),
         Tool(name="fetch_url", description="Fetch a URL and return its text.", fn=web.fetch_url),
         Tool(name="search_web", description="Search Wikipedia and return result summaries.", fn=web.search_wikipedia),
+        Tool(name="wikipedia_summary", description="Return the full intro of a Wikipedia article by title.", fn=web.wikipedia_summary),
         Tool(name="run_command", description="Run a shell command and return its output.", fn=shell.run_command),
         Tool(name="run_python", description="Execute a Python snippet and return its output.", fn=code.run_python),
         Tool(name="open_app", description="Open/launch an application by name (e.g. 'brave', 'notepad').", fn=shell.open_app),

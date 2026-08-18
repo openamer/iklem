@@ -59,3 +59,30 @@ def search_wikipedia(query: str) -> str:
         snippet = re.sub(r"<[^>]+>", "", r.get("snippet", "")).strip()
         lines.append(f"{title}: {snippet}")
     return "\n".join(lines)
+
+
+def wikipedia_summary(title: str) -> str:
+    """Return the full intro extract of a Wikipedia article by title.
+
+    This gives the agent a real, sourced answer (not a guess) for factual
+    questions. Returns the plain-text extract, truncated to 4000 chars.
+    """
+    url = (
+        "https://en.wikipedia.org/w/api.php?action=query&prop=extracts"
+        "&exintro=1&explaintext=1&format=json&titles=" + urllib.parse.quote(title)
+    )
+    req = urllib.request.Request(url, headers={"User-Agent": "iklem/0.1"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+    except (urllib.error.HTTPError, urllib.error.URLError, json.JSONDecodeError) as e:
+        return f"(error: {e})"
+
+    pages = data.get("query", {}).get("pages", {})
+    for page in pages.values():
+        extract = page.get("extract", "")
+        if extract:
+            if len(extract) > 4000:
+                extract = extract[:4000] + "…(truncated)"
+            return extract
+    return "(no article found)"

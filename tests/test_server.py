@@ -16,8 +16,12 @@ def _start_server(manager):
     return server
 
 
-def test_session_create_and_list():
-    manager = SessionManager()
+def _manager(tmp_path):
+    return SessionManager(data_file=tmp_path / "sessions.json")
+
+
+def test_session_create_and_list(tmp_path):
+    manager = _manager(tmp_path)
     sid = manager.create("Test")
     sessions = manager.list()
     assert len(sessions) == 1
@@ -25,14 +29,25 @@ def test_session_create_and_list():
     assert sessions[0]["title"] == "Test"
 
 
-def test_session_chat_unknown_session():
-    manager = SessionManager()
+def test_session_chat_unknown_session(tmp_path):
+    manager = _manager(tmp_path)
     result = manager.chat("nonexistent", "hello")
     assert "error" in result
 
 
-def test_health_endpoint():
-    manager = SessionManager()
+def test_session_persists_across_restart(tmp_path):
+    manager = _manager(tmp_path)
+    sid = manager.create("Persisted")
+    # A fresh manager reading the same file should see the session.
+    manager2 = _manager(tmp_path)
+    sessions = manager2.list()
+    assert len(sessions) == 1
+    assert sessions[0]["id"] == sid
+    assert sessions[0]["title"] == "Persisted"
+
+
+def test_health_endpoint(tmp_path):
+    manager = _manager(tmp_path)
     server = _start_server(manager)
     try:
         import urllib.request
@@ -46,14 +61,13 @@ def test_health_endpoint():
         server.server_close()
 
 
-def test_sessions_endpoint_roundtrip():
-    manager = SessionManager()
+def test_sessions_endpoint_roundtrip(tmp_path):
+    manager = _manager(tmp_path)
     server = _start_server(manager)
     try:
         import urllib.request
 
         port = server.server_address[1]
-        # Create a session
         req = urllib.request.Request(
             f"http://127.0.0.1:{port}/sessions",
             data=json.dumps({"title": "My session"}).encode(),
@@ -64,7 +78,6 @@ def test_sessions_endpoint_roundtrip():
             created = json.loads(r.read())
         assert "id" in created
 
-        # List sessions
         with urllib.request.urlopen(f"http://127.0.0.1:{port}/sessions", timeout=10) as r:
             sessions = json.loads(r.read())
         assert len(sessions) == 1

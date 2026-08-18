@@ -66,7 +66,10 @@ class Agent:
         "something that a tool can do. "
         "When the user asks about themselves (their name, preferences, or "
         "anything you may have been told before), call list_memories or recall "
-        "first before answering — do not say you do not know without checking."
+        "first before answering — do not say you do not know without checking. "
+        "When you solve a task that could recur (a procedure, a workflow, a "
+        "multi-step process), save it as a skill with save_skill so you can "
+        "reuse it next time — this is how you improve with use."
     )
     history: list[Message] = field(default_factory=list)
     max_tool_rounds: int = 5
