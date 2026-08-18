@@ -14,11 +14,12 @@ function startServer() {
   const candidates = [
     path.join(process.env.USERPROFILE || '', 'iklem', '.venv', 'Scripts', 'iklem.exe'),
     path.join(process.env.USERPROFILE || '', '.local', 'bin', 'iklem.cmd'),
+    path.join(process.env.USERPROFILE || '', '.local', 'bin', 'iklem'),
   ];
   const iklem = candidates.find((p) => require('fs').existsSync(p));
   if (!iklem) {
-    console.error('iklem CLI not found; server not started');
-    return;
+    console.error('iklem backend not found — install it first (pip install -e .)');
+    return false;
   }
   const isCmd = iklem.endsWith('.cmd');
   serverProcess = spawn(iklem, ['--server'], {
@@ -26,6 +27,7 @@ function startServer() {
     shell: isCmd,
   });
   serverProcess.on('error', (err) => console.error('server error:', err));
+  return true;
 }
 
 function stopServer() {
