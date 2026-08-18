@@ -235,7 +235,9 @@ def make_handler(manager: SessionManager) -> type[BaseHTTPRequestHandler]:
 
         def do_GET(self) -> None:
             if self.path == "/health":
-                self._json({"ok": True, "version": "0.1.0"})
+                from iklem import __version__
+
+                self._json({"ok": True, "version": __version__})
             elif self.path == "/" or self.path == "/index.html":
                 from iklem.webui import WEB_UI_HTML
 

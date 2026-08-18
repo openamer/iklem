@@ -45,7 +45,9 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
     if args.version:
-        print("iklem 0.1.0")
+        from iklem import __version__
+
+        print(f"iklem {__version__}")
         return 0
 
     from iklem.core.runtime import Runtime

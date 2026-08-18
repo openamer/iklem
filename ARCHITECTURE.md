@@ -64,27 +64,37 @@ iklem/
 │   ├── tools/           # the agent's capabilities (plugins)
 │   │   ├── registry.py  #   the full tool set
 │   │   ├── system.py    #   date/time/system/file tools
-│   │   ├── web.py       #   fetch_url + Wikipedia search
+│   │   ├── web.py       #   fetch_url + Wikipedia search + summary
 │   │   ├── shell.py     #   run_command + open_app
-│   │   └── memory.py    #   remember/recall/list_memories
+│   │   ├── code.py      #   run_python (execute Python snippets)
+│   │   ├── memory.py    #   remember/recall/list_memories
+│   │   └── skills.py    #   save_skill/list_skills/get_skill
 │   ├── gateway/         # platform breadth (from openclaw)
 │   │   ├── base.py      #   channel adapter ABC
+│   │   ├── gateway.py   #   one process fans out to all channels
 │   │   ├── telegram.py  #   Telegram channel
 │   │   ├── slack.py     #   Slack channel
-│   │   └── discord.py   #   Discord channel
+│   │   ├── discord.py   #   Discord channel
+│   │   ├── whatsapp.py  #   WhatsApp Cloud API channel
+│   │   └── signal.py    #   Signal channel (via signal-cli)
 │   ├── swarm/           # nodes share signed knowledge
 │   │   ├── packet.py    #   signed, leak-free knowledge packets
 │   │   ├── node.py      #   node identity + sign/verify
-│   │   └── relay.py     #   untrusted HTTP store-and-forward relay
+│   │   └── relay.py     #   untrusted HTTP store-and-forward relay (persistent)
 │   ├── plugins/         # everything is a plugin (from deepseek-harness)
 │   │   ├── manifest.py  #   plugin manifest + registry
 │   │   └── discovery.py #   runtime plugin loading from a directory
+│   ├── server.py        #   HTTP JSON API + session persistence
+│   ├── webui.py         #   self-contained browser UI served at /
+│   ├── doctor.py        #   health-check command (the "does not break" axis)
 │   └── verify/          # the "does not break" axis
 │       └── checks.py    #   pre/post condition checks, honest error reporting
-├── tests/               # 37 tests, all green
+├── desktop/             # Electron desktop app (chat, sessions, settings)
+├── tests/               # 58 tests, all green
 ├── .github/workflows/   # CI (runs tests on push/PR)
 ├── pyproject.toml
 ├── README.md
+├── LICENSE
 └── ARCHITECTURE.md      # this file
 ```
 
