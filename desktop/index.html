@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iklem</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">◆</span>
+        <span class="brand-name">iklem</span>
+      </div>
+      <button id="new-session" class="new-session">+ New session</button>
+      <nav class="session-list" id="session-list"></nav>
+      <div class="sidebar-footer">
+        <button id="settings-btn" class="footer-btn">⚙ Settings</button>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="chat-header">
+        <span id="chat-title">iklem</span>
+        <span id="status" class="status">connecting…</span>
+      </header>
+      <div class="messages" id="messages"></div>
+      <footer class="composer">
+        <textarea id="input" rows="1" placeholder="Message iklem…"></textarea>
+        <button id="send" class="send">Send</button>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Settings modal -->
+  <div class="modal hidden" id="settings-modal">
+    <div class="modal-card">
+      <h2>Settings</h2>
+      <label>Model</label>
+      <input id="cfg-model" type="text" placeholder="deepseek-v4-flash:cloud" />
+      <label>Ollama URL</label>
+      <input id="cfg-url" type="text" placeholder="http://localhost:11434" />
+      <div class="modal-actions">
+        <button id="settings-close" class="secondary">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
