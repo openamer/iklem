@@ -27,6 +27,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--swarm-publish", nargs=2, metavar=("KIND", "CONTENT"), help="sign and publish a packet to the relay")
     p.add_argument("--swarm-list", action="store_true", help="list packets from the relay")
     p.add_argument("--server", action="store_true", help="run the HTTP server (desktop app backend)")
+    p.add_argument("--doctor", action="store_true", help="diagnose the health of this install")
     p.add_argument("ask", nargs="*", help="ask a question (non-interactive)")
     return p
 
@@ -138,6 +139,11 @@ def main(argv: list[str] | None = None) -> int:
 
         serve()
         return 0
+
+    if args.doctor:
+        from iklem.doctor import main as doctor_main
+
+        return doctor_main()
 
     if args.ask:
         agent = _make_agent()
