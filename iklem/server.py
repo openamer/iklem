@@ -165,19 +165,40 @@ class SessionManager:
 def _make_agent() -> Agent:
     from iklem.providers.ollama import OllamaProvider
 
-    return Agent(provider=OllamaProvider())
+    cfg = _load_config()
+    model = cfg.get("IKLEM_OLLAMA_MODEL")
+    base_url = cfg.get("IKLEM_OLLAMA_URL")
+    return Agent(provider=OllamaProvider(model=model, base_url=base_url))
+
+
+def _config_file() -> Path:
+    base = os.environ.get("LOCALAPPDATA") or os.environ.get("HOME") or "."
+    return Path(base) / "iklem" / "config.json"
+
+
+def _load_config() -> dict[str, str]:
+    path = _config_file()
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _save_config(config: dict[str, str]) -> None:
+    path = _config_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(config, indent=2), encoding="utf-8")
+    os.replace(tmp, path)
 
 
 def _read_config() -> dict[str, str]:
-    """Return the current config, redacting secrets."""
-    keys = [
-        "IKLEM_OLLAMA_MODEL",
-        "IKLEM_OLLAMA_URL",
-        "IKLEM_NODE_ID",
-        "IKLEM_RELAY_URL",
-    ]
-    config = {}
-    for k in keys:
+    """Return the current config (persisted + env), redacting secrets."""
+    config = _load_config()
+    # Env vars override persisted config.
+    for k in ("IKLEM_OLLAMA_MODEL", "IKLEM_OLLAMA_URL"):
         v = os.environ.get(k)
         if v:
             config[k] = v
@@ -243,6 +264,14 @@ def make_handler(manager: SessionManager) -> type[BaseHTTPRequestHandler]:
                 body = self._read_body()
                 sid = manager.create(title=body.get("title", "New session"))
                 self._json({"id": sid})
+            elif self.path == "/config":
+                body = self._read_body()
+                config = _load_config()
+                for k in ("IKLEM_OLLAMA_MODEL", "IKLEM_OLLAMA_URL"):
+                    if body.get(k):
+                        config[k] = body[k]
+                _save_config(config)
+                self._json({"ok": True})
             elif self.path.endswith("/stream"):
                 parts = self.path.split("/")
                 sid = parts[2]

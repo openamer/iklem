@@ -28,12 +28,13 @@ architecture, then adds its own axis.
 - **Think** — a local Ollama model (private, offline) or any OpenAI-compatible
   endpoint. Default is a cloud model for reliable tool-calling.
 - **Act** — the agent calls tools (date, time, system info, web search, shell
-  commands, open apps) and answers from real data, not guesses.
-- **Learn** — memory and conversation history persist across sessions; a fresh
-  session recalls what it was told before.
+  commands, Python code, open apps) and answers from real data, not guesses.
+- **Learn** — memory, conversation history, and skills persist across
+  sessions; multi-step procedures are distilled into skills automatically.
 - **Share** — a swarm of nodes exchanging signed, verifiable knowledge packets
   over an untrusted relay.
-- **Reach you** — CLI, Telegram, Slack, and Discord channels, all as plugins.
+- **Reach you** — CLI, web UI, desktop app, Telegram, Slack, Discord,
+  WhatsApp, and Signal channels, all as plugins.
 - **Extend** — channels, providers, and tools are plugins; new plugins are
   discovered at runtime from a directory.
 
@@ -48,6 +49,8 @@ pip install -e ".[dev]"
 ```bash
 iklem                          # interactive chat
 iklem ask "what is iklem?"     # one-shot question
+iklem --server                 # HTTP server + web UI at http://127.0.0.1:8787/
+iklem --gateway                # fan out to all configured channels
 iklem --remember name Damir    # store a memory
 iklem --recall name            # recall a memory
 iklem --skill deploy "..."     # add a skill
@@ -57,6 +60,15 @@ iklem --swarm-publish skill "..."  # sign + publish a packet
 iklem --swarm-list             # list + verify packets
 ```
 
+## Desktop app
+
+```bash
+cd desktop
+npm install
+npm start          # run the Electron app
+npm run dist       # build the Windows installer (.exe)
+```
+
 ## Configuration (environment)
 
 | Variable | Purpose |
@@ -64,11 +76,13 @@ iklem --swarm-list             # list + verify packets
 | `IKLEM_OLLAMA_MODEL` | model (default `deepseek-v4-flash:cloud`) |
 | `IKLEM_OLLAMA_URL` | Ollama endpoint (default `http://localhost:11434`) |
 | `IKLEM_API_KEY` / `IKLEM_BASE_URL` / `IKLEM_MODEL` | OpenAI-compatible provider |
-| `IKLEM_HOME` | data directory (memory, history, plugins) |
+| `IKLEM_HOME` | data directory (memory, history, sessions, plugins) |
 | `IKLEM_PLUGIN_DIR` | plugin directory (default `~/.iklem/plugins`) |
 | `IKLEM_TELEGRAM_TOKEN` | Telegram bot token |
 | `IKLEM_SLACK_TOKEN` / `IKLEM_SLACK_CHANNEL` | Slack bot |
 | `IKLEM_DISCORD_TOKEN` / `IKLEM_DISCORD_CHANNEL` | Discord bot |
+| `IKLEM_WHATSAPP_TOKEN` / `IKLEM_WHATSAPP_PHONE_ID` | WhatsApp Cloud API |
+| `IKLEM_SIGNAL_NUMBER` | Signal (via signal-cli) |
 | `IKLEM_NODE_ID` / `IKLEM_SWARM_SECRET` | swarm identity |
 | `IKLEM_RELAY_URL` | swarm relay (default `http://127.0.0.1:8765`) |
 

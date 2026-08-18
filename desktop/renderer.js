@@ -186,6 +186,16 @@ $('settings-btn').onclick = () => {
   $('settings-modal').classList.remove('hidden');
 };
 $('settings-close').onclick = () => $('settings-modal').classList.add('hidden');
+$('settings-save').onclick = async () => {
+  await api('/config', {
+    method: 'POST',
+    body: JSON.stringify({
+      IKLEM_OLLAMA_MODEL: $('cfg-model').value,
+      IKLEM_OLLAMA_URL: $('cfg-url').value,
+    }),
+  });
+  $('settings-modal').classList.add('hidden');
+};
 
 // Theme toggle (persisted in localStorage)
 function applyTheme(light) {
