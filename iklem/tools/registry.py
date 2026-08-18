@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from iklem.tools import browser, code, computer, cron, delegate, git, memory, selfextend, selfmodify, shell, skills, system, web
+from iklem.tools import browser, code, computer, cron, delegate, files, git, http, memory, process, selfextend, selfmodify, shell, skills, system, util, web
 
 
 @dataclass(frozen=True)
@@ -65,6 +65,20 @@ def _builtin_tools() -> list[Tool]:
         Tool(name="screenshot", description="Take a screenshot and return its file path.", fn=computer.screenshot),
         Tool(name="click", description="Click at screen coordinates (x, y).", fn=computer.click),
         Tool(name="type_text", description="Type text at the current cursor position.", fn=computer.type_text),
+        Tool(name="write_file", description="Write text content to a file.", fn=files.write_file),
+        Tool(name="search_files", description="Search file contents for a substring under a directory.", fn=files.search_files),
+        Tool(name="copy_file", description="Copy a file from src to dst.", fn=files.copy_file),
+        Tool(name="move_file", description="Move (rename) a file from src to dst.", fn=files.move_file),
+        Tool(name="delete_file", description="Delete a file or empty directory.", fn=files.delete_file),
+        Tool(name="http_request", description="Make an HTTP request (GET/POST/PUT/DELETE) and return the response.", fn=http.http_request),
+        Tool(name="weather", description="Return current weather for a city (open-meteo, no key).", fn=http.weather),
+        Tool(name="json_parse", description="Parse a JSON string and return it pretty-printed.", fn=util.json_parse),
+        Tool(name="math_eval", description="Evaluate a safe arithmetic expression.", fn=util.math_eval),
+        Tool(name="world_time", description="Return the current time in an IANA timezone.", fn=util.world_time),
+        Tool(name="random_uuid", description="Return a random UUID v4.", fn=util.random_uuid),
+        Tool(name="random_number", description="Return a random integer between low and high.", fn=util.random_number),
+        Tool(name="list_processes", description="List running processes (name + PID).", fn=process.list_processes),
+        Tool(name="kill_process", description="Terminate a process by its PID.", fn=process.kill_process),
     ]
 
 
