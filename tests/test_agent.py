@@ -20,23 +20,26 @@ class _FakeProvider(Provider):
         return ProviderResult(content="", ok=False, error="no more results")
 
 
+def _agent(results, **kwargs) -> Agent:
+    # Disable history persistence so tests are isolated from real state.
+    return Agent(provider=_FakeProvider(results), persist_history=False, **kwargs)
+
+
 def test_agent_returns_provider_result():
-    agent = Agent(provider=_FakeProvider([ProviderResult(content="hi", ok=True)]))
+    agent = _agent([ProviderResult(content="hi", ok=True)])
     result = agent.respond("hello")
     assert result.ok
     assert result.content == "hi"
 
 
 def test_agent_appends_history_on_success():
-    agent = Agent(provider=_FakeProvider([ProviderResult(content="hi", ok=True)]))
+    agent = _agent([ProviderResult(content="hi", ok=True)])
     agent.respond("hello")
     assert len(agent.history) == 2  # user + assistant
 
 
 def test_agent_does_not_append_history_on_failure():
-    agent = Agent(
-        provider=_FakeProvider([ProviderResult(content="", ok=False, error="boom")])
-    )
+    agent = _agent([ProviderResult(content="", ok=False, error="boom")])
     result = agent.respond("hello")
     assert not result.ok
     assert result.error == "boom"
@@ -44,8 +47,8 @@ def test_agent_does_not_append_history_on_failure():
 
 
 def test_agent_includes_system_prompt():
-    agent = Agent(
-        provider=_FakeProvider([ProviderResult(content="hi", ok=True)]),
+    agent = _agent(
+        [ProviderResult(content="hi", ok=True)],
         system_prompt="You are a test.",
     )
     agent.respond("hello")
@@ -58,33 +61,40 @@ def test_agent_includes_system_prompt():
 
 def test_agent_executes_tool_call_then_answers():
     """The model first asks for the date, then answers from the tool result."""
-    provider = _FakeProvider(
+    agent = _agent(
         [
             ProviderResult(tool_calls=[ToolCall(name="current_date", arguments={})]),
             ProviderResult(content="Today is 2026-08-18.", ok=True),
         ]
     )
-    agent = Agent(provider=provider)
     result = agent.respond("what is today's date?")
     assert result.ok
     assert result.content == "Today is 2026-08-18."
-    # The second call should have received a tool result message.
-    second_messages = provider.calls[1]
+    second_messages = agent.provider.calls[1]
     roles = [m.role for m in second_messages]
     assert "tool" in roles
 
 
 def test_agent_unknown_tool_returns_error():
-    provider = _FakeProvider(
+    agent = _agent(
         [
             ProviderResult(tool_calls=[ToolCall(name="does_not_exist", arguments={})]),
             ProviderResult(content="I couldn't do that.", ok=True),
         ]
     )
-    agent = Agent(provider=provider)
     result = agent.respond("do something")
     assert result.ok
-    # The tool result fed back should mention the unknown tool.
-    tool_msgs = [m for m in provider.calls[1] if m.role == "tool"]
+    tool_msgs = [m for m in agent.provider.calls[1] if m.role == "tool"]
     assert tool_msgs
     assert "unknown tool" in tool_msgs[0].content
+
+
+def test_tool_schema_derives_parameters():
+    """Tool schemas must expose parameter names, not empty properties."""
+    from iklem.core.agent import _tool_schema
+    from iklem.tools.registry import tool_by_name
+
+    schema = _tool_schema(tool_by_name("remember"))
+    props = schema["function"]["parameters"]["properties"]
+    assert "key" in props
+    assert "value" in props

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 
 from iklem.providers.base import Message, Provider, ProviderResult, ToolCall
 from iklem.tools.registry import all_tools, tool_by_name
+from iklem.memory import history as history_store
 
 
 def _tool_schema(tool) -> dict:
@@ -67,6 +68,12 @@ class Agent:
     )
     history: list[Message] = field(default_factory=list)
     max_tool_rounds: int = 5
+    persist_history: bool = True
+
+    def __post_init__(self) -> None:
+        # Resume from the last session: load persisted conversation history.
+        if self.persist_history and not self.history:
+            self.history = history_store.load_history()
 
     def respond(self, user: str) -> ProviderResult:
         """Respond to a user message, calling tools as needed."""
@@ -86,6 +93,8 @@ class Agent:
                 # Final answer.
                 self.history.append(Message(role="user", content=user))
                 self.history.append(Message(role="assistant", content=result.content))
+                if self.persist_history:
+                    history_store.save_history(self.history)
                 return result
 
             # Execute tool calls and append results for the next round.

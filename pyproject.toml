@@ -23,6 +23,9 @@ classifiers = [
 [project.scripts]
 iklem = "iklem.cli:main"
 
+[project.optional-dependencies]
+dev = ["pytest"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["iklem"]
 

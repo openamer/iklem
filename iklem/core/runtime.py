@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from iklem.memory.store import MemoryStore
+from iklem.plugins.discovery import discover_plugins
 from iklem.plugins.manifest import PluginRegistry
 
 
@@ -25,7 +26,7 @@ class Runtime:
 
     def __init__(self, memory: MemoryStore | None = None) -> None:
         self.memory = memory or MemoryStore()
-        self.plugins = PluginRegistry()
+        self.plugins: PluginRegistry = discover_plugins()
 
     def run_turn(self, user: str) -> Turn:
         """Run a single turn. Returns the turn with any tool results.
