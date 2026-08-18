@@ -83,11 +83,15 @@ class Agent:
     history: list[Message] = field(default_factory=list)
     max_tool_rounds: int = 5
     persist_history: bool = True
+    tools: list = field(default_factory=list)
 
     def __post_init__(self) -> None:
         # Resume from the last session: load persisted conversation history.
         if self.persist_history and not self.history:
             self.history = history_store.load_history()
+        # Default to the full tool set unless a custom set was provided.
+        if not self.tools:
+            self.tools = all_tools()
 
     def respond(self, user: str) -> ProviderResult:
         """Respond to a user message, calling tools as needed."""
@@ -95,8 +99,7 @@ class Agent:
         messages.extend(self.history)
         messages.append(Message(role="user", content=user))
 
-        tools = all_tools()
-        schemas = [_tool_schema(t) for t in tools]
+        schemas = [_tool_schema(t) for t in self.tools]
         tool_trace: list[str] = []
 
         for _ in range(self.max_tool_rounds):
@@ -158,7 +161,7 @@ class Agent:
         reg.add(Skill(name=name, description=user[:80], steps=steps))
 
     def _run_tool(self, call: ToolCall) -> str:
-        tool = tool_by_name(call.name)
+        tool = next((t for t in self.tools if t.name == call.name), None)
         if tool is None:
             return f"(unknown tool: {call.name})"
         try:
