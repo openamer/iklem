@@ -63,7 +63,12 @@ def _verify(path: Path, name: str) -> tuple[bool, str, object | None]:
     pycache = path.parent / "__pycache__"
     if pycache.is_dir():
         for stale in pycache.glob(f"{name}.*.pyc"):
-            stale.unlink(missing_ok=True)
+            try:
+                stale.unlink(missing_ok=True)
+            except OSError:
+                # Best-effort: another thread may hold the .pyc open. The
+                # import below still re-reads the source, so this is safe.
+                pass
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         return (False, "could not load module", None)
