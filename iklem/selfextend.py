@@ -40,7 +40,7 @@ def write_extension(name: str, code: str) -> tuple[bool, str]:
     tmp = directory / f".{name}.tmp.py"
     tmp.write_text(code, encoding="utf-8")
 
-    ok, message = _verify(tmp, name)
+    ok, message, _ = _verify(tmp, name)
     if not ok:
         tmp.unlink(missing_ok=True)
         return (False, message)
@@ -50,8 +50,12 @@ def write_extension(name: str, code: str) -> tuple[bool, str]:
     return (True, f"tool '{name}' added and verified")
 
 
-def _verify(path: Path, name: str) -> tuple[bool, str]:
-    """Import a candidate extension and check it has the right shape."""
+def _verify(path: Path, name: str) -> tuple[bool, str, object | None]:
+    """Import a candidate extension and check it has the right shape.
+
+    Returns (ok, description, run_fn). The run function is returned directly
+    (not via sys.modules) so concurrent callers never see a stale module.
+    """
     module_name = f"iklem_selfext_{name}"
     # Invalidate any cached module AND its bytecode cache, so a fixed
     # extension is re-imported fresh (otherwise the old .pyc wins).
@@ -62,21 +66,21 @@ def _verify(path: Path, name: str) -> tuple[bool, str]:
             stale.unlink(missing_ok=True)
     spec = importlib.util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
-        return (False, "could not load module")
+        return (False, "could not load module", None)
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
     except Exception as e:  # noqa: BLE001 — a broken extension must not crash
-        return (False, f"import failed: {e}")
+        return (False, f"import failed: {e}", None)
 
     run = getattr(module, "run", None)
     if not callable(run):
-        return (False, "extension must define a callable run(...)")
+        return (False, "extension must define a callable run(...)", None)
     description = getattr(module, "DESCRIPTION", "")
     if not isinstance(description, str) or not description:
-        return (False, "extension must define a DESCRIPTION string")
-    return (True, description)
+        return (False, "extension must define a DESCRIPTION string", None)
+    return (True, description, run)
 
 
 def load_extensions() -> list[tuple[str, str, object]]:
@@ -89,12 +93,9 @@ def load_extensions() -> list[tuple[str, str, object]]:
         if path.name.startswith("."):
             continue
         name = path.stem
-        ok, description = _verify(path, name)
-        if ok:
-            module_name = f"iklem_selfext_{name}"
-            module = sys.modules.get(module_name)
-            if module is not None:
-                loaded.append((name, description, module.run))
+        ok, description, run = _verify(path, name)
+        if ok and run is not None:
+            loaded.append((name, description, run))
     return loaded
 
 
@@ -108,7 +109,7 @@ def list_extensions() -> list[tuple[str, str]]:
         if path.name.startswith("."):
             continue
         name = path.stem
-        ok, description = _verify(path, name)
+        ok, description, _ = _verify(path, name)
         result.append((name, description if ok else f"(broken: {description})"))
     return result
 
@@ -141,7 +142,7 @@ def fix_extension(name: str, code: str) -> tuple[bool, str]:
     # Write the candidate to a temp file and verify before promoting.
     tmp = directory / f".{name}.tmp.py"
     tmp.write_text(code, encoding="utf-8")
-    ok, message = _verify(tmp, name)
+    ok, message, _ = _verify(tmp, name)
     if not ok:
         tmp.unlink(missing_ok=True)
         return (False, f"fix rejected (previous version kept): {message}")

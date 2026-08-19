@@ -22,6 +22,9 @@ function setStatus(text, cls) {
 }
 
 function addMessage(role, content) {
+  // Hide the welcome screen once the first message appears.
+  const welcome = $('welcome');
+  if (welcome) welcome.remove();
   const div = document.createElement('div');
   div.className = 'msg ' + role;
   if (role === 'assistant') {
@@ -51,6 +54,11 @@ async function loadSessions() {
       };
       list.appendChild(item);
     });
+    // If no session is selected but sessions exist, open the first one
+    // (instead of creating yet another "New session").
+    if (!currentSessionId && sessions.length > 0) {
+      openSession(sessions[0].id, sessions[0].title);
+    }
   } catch (e) {
     setStatus('offline', 'err');
   }
@@ -67,13 +75,35 @@ function hideContextMenu() {
   $('context-menu').classList.add('hidden');
 }
 
+function showWelcome() {
+  const messages = $('messages');
+  messages.innerHTML = '';
+  const w = document.createElement('div');
+  w.className = 'welcome';
+  w.id = 'welcome';
+  w.innerHTML =
+    '<div class="welcome-mark">◆</div>' +
+    '<h1>iklem</h1>' +
+    '<p>Ein selbstverbessernder KI-Agent — forged, not cloned.</p>' +
+    '<div class="welcome-hints">' +
+    '<span>Frag nach dem Datum oder der Uhrzeit</span>' +
+    '<span>Lass mich Dateien lesen oder Code ausführen</span>' +
+    '<span>Suche im Web oder öffne eine App</span>' +
+    '</div>';
+  messages.appendChild(w);
+}
+
 async function openSession(id, title) {
   currentSessionId = id;
   $('chat-title').textContent = title;
   $('messages').innerHTML = '';
   try {
     const messages = await api('/sessions/' + id);
-    messages.forEach((m) => addMessage(m.role, m.content));
+    if (messages.length === 0) {
+      showWelcome();
+    } else {
+      messages.forEach((m) => addMessage(m.role, m.content));
+    }
   } catch (e) {
     addMessage('error', 'Failed to load session');
   }
@@ -88,7 +118,7 @@ async function newSession() {
     });
     currentSessionId = res.id;
     $('chat-title').textContent = 'New session';
-    $('messages').innerHTML = '';
+    showWelcome();
     loadSessions();
   } catch (e) {
     setStatus('offline', 'err');
@@ -237,5 +267,6 @@ document.addEventListener('click', (e) => {
 (async () => {
   await checkHealth();
   await loadSessions();
+  // Only create a new session if there are none at all.
   if (!currentSessionId) await newSession();
 })();

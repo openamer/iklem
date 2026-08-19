@@ -67,8 +67,10 @@ function renderTable(rows) {
   }
   html += '</tr></thead><tbody>';
   for (const row of body) {
-    // skip separator rows like |---|---|
-    if (row.every((c) => /^:?-{2,}:?$/.test(c.trim()))) continue;
+    // skip separator rows like |---|---| (ignore empty cells from the
+    // leading/trailing pipes)
+    const cells = row.filter((c) => c.trim() !== '');
+    if (cells.length > 0 && cells.every((c) => /^:?-{2,}:?$/.test(c.trim()))) continue;
     html += '<tr>';
     for (const cell of row) {
       html += `<td>${renderInline(cell.trim())}</td>`;
