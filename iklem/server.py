@@ -79,7 +79,15 @@ class SessionManager:
     def _ensure_agent(self, session: dict[str, Any]) -> Agent:
         if session["agent"] is None:
             session["agent"] = _make_agent()
-        return session["agent"]
+        # Load this session's prior messages into the agent's history so it
+        # remembers the current conversation (but NOT other sessions).
+        agent = session["agent"]
+        agent.history = [
+            Message(role=m["role"], content=m["content"])
+            for m in session["messages"]
+            if m.get("role") in ("user", "assistant")
+        ]
+        return agent
 
     def create(self, title: str = "New session") -> str:
         sid = uuid.uuid4().hex[:12]
@@ -136,30 +144,30 @@ class SessionManager:
         return {"reply": result.content}
 
     def stream_chat(self, sid: str, text: str):
-        """Yield reply chunks for a streaming response (no tool-calling)."""
+        """Yield reply chunks for a streaming response.
+
+        Uses the full agent loop (with tool-calling), then streams the final
+        answer in chunks so the UI still updates progressively. This is what
+        makes the desktop chat an agent (calls tools) rather than a chatbot.
+        """
         session = self.get(sid)
         if session is None:
             yield "(error: session not found)"
             return
         agent: Agent = self._ensure_agent(session)
-        provider = agent.provider
-        if not hasattr(provider, "stream"):
-            # Fall back to a single non-streamed reply.
-            result = agent.respond(text)
-            yield result.content if result.ok else f"(error: {result.error})"
+        result = agent.respond(text)
+        if not result.ok:
+            yield f"(error: {result.error})"
             return
-        messages = [Message(role="system", content=agent.system_prompt)]
-        messages.extend(agent.history)
-        messages.append(Message(role="user", content=text))
-        full = []
-        for chunk in provider.stream(messages):
-            full.append(chunk)
-            yield chunk
-        reply = "".join(full)
+        reply = result.content
         with self._lock:
             session["messages"].append({"role": "user", "content": text})
             session["messages"].append({"role": "assistant", "content": reply})
             self._persist()
+        # Stream the final answer in chunks so the UI updates progressively.
+        chunk = 80
+        for i in range(0, len(reply), chunk):
+            yield reply[i : i + chunk]
 
 
 def _make_agent() -> Agent:
@@ -168,7 +176,10 @@ def _make_agent() -> Agent:
     cfg = _load_config()
     model = cfg.get("IKLEM_OLLAMA_MODEL")
     base_url = cfg.get("IKLEM_OLLAMA_URL")
-    return Agent(provider=OllamaProvider(model=model, base_url=base_url))
+    # persist_history=False: each session keeps its own history (loaded from
+    # the session's messages), NOT a shared global history. This is what
+    # prevents one session from "remembering" another session's conversation.
+    return Agent(provider=OllamaProvider(model=model, base_url=base_url), persist_history=False)
 
 
 def _config_file() -> Path:
